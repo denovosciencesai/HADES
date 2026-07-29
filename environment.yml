@@ -1,0 +1,20 @@
+# Reproducible environment for the HADES project.
+#
+# Recreate on any machine with:
+#     conda env create -f environment.yml
+#     conda activate hades
+#
+# RDKit is installed through conda-forge because its compiled components install
+# far more reliably that way than through pip. Everything else is pinned in
+# requirements.txt and installed with pip.
+
+name: hades
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - rdkit=2025.9.6        # if conda-forge reports a different build string,
+                          # run:  conda search -c conda-forge rdkit  and adjust
+  - pip
+  - pip:
+      - -r requirements.txt

@@ -1,0 +1,30 @@
+# ---- Environments ----
+.venv/
+venv/
+env/
+.conda/
+*.egg-info/
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
+
+# ---- PyCharm ----
+.idea/
+
+# ---- Training run outputs (large & regenerable -> keep OUT of git) ----
+# Tip: train with  -o runs/<name>  so every run lands under runs/.
+runs/
+hades_run_*/
+
+# ---- Data ----
+# Data files are ignored by default. To ship a small test set (e.g. the example
+# molecules), whitelist it with a line like:  !molecules_10.csv
+*.csv
+!molecules_10.csv
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
