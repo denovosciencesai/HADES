@@ -3,7 +3,6 @@ from sklearn.base import clone
 from tqdm.auto import tqdm
 from sklearn.model_selection import cross_val_score
 
-
 class CorrDrop:
 	"""
 	A class to iteratively drop highly correlated features based on a correlation threshold
