@@ -29,6 +29,7 @@ try:
 except Exception:
     pass
 
+@contextlib.contextmanager
 def suppress_output():
     """Silence anything printed straight to stdout/stderr inside this block.
     This is the catch-all for messages that bypass logging/tqdm entirely
