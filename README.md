@@ -142,4 +142,13 @@ fallback that searches parent folders), so you do not need to copy `HADES` into
 the run folder — just keep the run folder inside the repo.
 
 
+write about quiet_noise.py like this
+## Quiet Setup (`quiet_setup.py`)
+
+Suppresses noisy console output from `chemprop`, `admet_ai`, LightGBM, and `tqdm`
+progress bars during model loading and inference.
+
+**Usage:** Import it first, before any other heavy library:
+
+
 
