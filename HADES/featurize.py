@@ -29,18 +29,14 @@ ADMET_AI_FEATURES = ['logP', 'hydrogen_bond_acceptors', 'hydrogen_bond_donors',
 
 def neutralize_atoms(mol): # I have changed it because old def crushed on boron atoms
     """
-    Neutralize charges while avoiding atoms where this can create
-    invalid valences (e.g. boron).
+    Neutralize charges while avoiding atoms where this can create invalid valences (e.g. boron).
     """
     pattern = Chem.MolFromSmarts(
         "[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]"
     )
-
     at_matches = mol.GetSubstructMatches(pattern)
-
     for (at_idx,) in at_matches:
         atom = mol.GetAtomWithIdx(at_idx)
-
         # Only neutralize N, O, P, S
         if atom.GetAtomicNum() not in (7, 8, 15, 16):
             continue
@@ -48,39 +44,14 @@ def neutralize_atoms(mol): # I have changed it because old def crushed on boron 
         try:
             chg = atom.GetFormalCharge()
             hcount = atom.GetTotalNumHs()
-
             atom.SetFormalCharge(0)
             atom.SetNumExplicitHs(hcount - chg)
             atom.UpdatePropertyCache()
-
         except Exception as e:
-            print("=" * 80)
-            print("Failed during neutralization")
-            print("SMILES:", Chem.MolToSmiles(mol))
-            print("Atom index:", at_idx)
-            print("Atom:", atom.GetSymbol())
+            print(f"{Chem.MolToSmiles(mol)} Failed during neutralization on atom {atom.GetSymbol()} at index {at_idx}")
             print(e)
-            print("=" * 80)
             raise
-
     return mol
-
-# def neutralize_atoms(mol):
-# 	# TODO: utils?
-# 	"""Neutralize charges, from rdkit.org/docs/Cookbook.html#neutralizing-molecules"""
-# 	pattern = Chem.MolFromSmarts("[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]")
-# 	at_matches = mol.GetSubstructMatches(pattern)
-# 	at_matches_list = [y[0] for y in at_matches]
-# 	if len(at_matches_list) > 0:
-# 		for at_idx in at_matches_list:
-# 			atom = mol.GetAtomWithIdx(at_idx)
-# 			chg = atom.GetFormalCharge()
-# 			hcount = atom.GetTotalNumHs()
-# 			atom.SetFormalCharge(0)
-# 			atom.SetNumExplicitHs(hcount - chg)
-# 			atom.UpdatePropertyCache()
-# 	return mol
-
 
 class Featurizer:
 	"""
