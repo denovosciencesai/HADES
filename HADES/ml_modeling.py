@@ -4,13 +4,8 @@ import pandas as pd
 import optuna
 from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from optuna.exceptions import OptunaError
 from param_spaces import default_param_spaces
-
 
 class HPOptimizer:
 	"""
@@ -170,7 +165,6 @@ class MLModelEnsemble:
 		for model_name, items in self.models.items():
 			preds.append(items['model'].predict_proba(X)[:, 1])
 		return np.array(preds).mean(axis=1)
-
 
 if __name__ == "__main__":
 	# Define hyperparameter search spaces for different models
