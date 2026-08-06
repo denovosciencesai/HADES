@@ -1,43 +1,32 @@
-import os
-import warnings
-import logging
-import contextlib
+import os, warnings, logging, contextlib
 from functools import partialmethod
 
-# 1) Ask tqdm to disable all progress bars via its environment switch.
-os.environ.setdefault("TQDM_DISABLE", "1")
+_silenced = False
 
-# 2) Hide Python warnings (e.g. the LightGBM min_data_in_leaf notice).
-warnings.filterwarnings("ignore")
-
-# 3) Quiet the loggers chemprop / admet_ai use for their "Loading pretrained
-#    parameter ..." chatter.
-for _name in ("chemprop", "train", "admet_ai"):
-    logging.getLogger(_name).setLevel(logging.ERROR)
-
-# 4) Belt-and-braces: force every tqdm bar to start disabled, in case a library
-#    creates one directly and ignores the env var above.
-try:
-    from tqdm import tqdm as _tqdm
-    _tqdm.__init__ = partialmethod(_tqdm.__init__, disable=True)
-except Exception:
-    pass
-
-try:
-    from tqdm.auto import tqdm as _tqdm_auto
-    _tqdm_auto.__init__ = partialmethod(_tqdm_auto.__init__, disable=True)
-except Exception:
-    pass
+def silence_libraries():
+    global _silenced
+    if _silenced:
+        return
+    _silenced = True
+    os.environ.setdefault("TQDM_DISABLE", "1")
+    warnings.filterwarnings("ignore")
+    for name in ("chemprop", "train", "admet_ai"):
+        logging.getLogger(name).setLevel(logging.ERROR)
+    try:
+        from tqdm import tqdm as _t
+        _t.__init__ = partialmethod(_t.__init__, disable=True)
+    except Exception:
+        pass
+    try:
+        from tqdm.auto import tqdm as _ta
+        _ta.__init__ = partialmethod(_ta.__init__, disable=True)
+    except Exception:
+        pass
 
 @contextlib.contextmanager
-def suppress_output(enabled=True):
-    """Silence anything printed straight to stdout/stderr inside this block.
-
-    Pass enabled=False to make it a no-op (useful for debugging).
-    """
-    if not enabled:
-        yield
-        return
+def suppress_output():
     with open(os.devnull, "w") as devnull:
         with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
             yield
+
+silence_libraries()
