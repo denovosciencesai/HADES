@@ -30,13 +30,14 @@ except Exception:
     pass
 
 @contextlib.contextmanager
-def suppress_output():
+def suppress_output(enabled=True):
     """Silence anything printed straight to stdout/stderr inside this block.
-    This is the catch-all for messages that bypass logging/tqdm entirely
-    (some chemprop versions print parameter names directly to stdout).
-    A genuine exception still propagates and stops execution -- only the
-    printed text is discarded.
+
+    Pass enabled=False to make it a no-op (useful for debugging).
     """
+    if not enabled:
+        yield
+        return
     with open(os.devnull, "w") as devnull:
         with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
             yield
