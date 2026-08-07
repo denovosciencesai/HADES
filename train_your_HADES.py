@@ -125,7 +125,7 @@ class HADESTrainer:
         with open(os.path.join(out, "config.json"), "w") as f:
             json.dump(config, f, indent=4)
 
-        print(f"Done. Score with: HADES(models_dir='{out}/models', x_train_parquet='{out}/X_train.parquet')")
+        print(f"Done. Score with: HADES_score(models_dir='{out}/models', x_train_parquet='{out}/X_train.parquet')")
         return out
 
 
