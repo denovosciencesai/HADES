@@ -58,8 +58,14 @@ def main():
     p.add_argument("-i", "--input", dest="input_csv", help="Path to input CSV")
     p.add_argument("-o", "--output", dest="output_csv", help="Path to write output CSV")
     p.add_argument("--smiles-col", default="SMILES")
+    p.add_argument("--models-dir", default="./HADES_saved_models",
+                   help="Directory containing trained model .pkl files")
+    p.add_argument("--x-train", dest="x_train_parquet", default="./train_test_saved/X_train.parquet",
+                   help="Path to X_train.parquet used to derive descriptor columns and fill-na means")
     args = p.parse_args()
-    hades = HADES_score()
+
+    hades = HADES_score(models_dir=args.models_dir, x_train_parquet=args.x_train_parquet)
+
     if args.input_csv and args.output_csv:
         hades.score_csv(args.input_csv, args.output_csv, smiles_col=args.smiles_col)
     elif args.input_csv or args.output_csv:
@@ -67,6 +73,7 @@ def main():
     else:
         print(hades.score(["NC(=O)N1CCN(C(=O)Cc2ccc(CN3CCc4ccccc43)cc2)CC1",
                             "Cc1cccnc1NC(=O)c1cccc(C(=O)N2CCN(C)CC2)c1", "C1CCCC1", "CCO"]))
+
 
 if __name__ == "__main__":
     main()

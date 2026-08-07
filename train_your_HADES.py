@@ -1,4 +1,4 @@
-import argparse, datetime as dt, json, os
+import argparse, datetime as dt, json, os, importlib.util
 from collections import Counter
 
 import joblib, numpy as np, pandas as pd
@@ -12,7 +12,7 @@ from xgboost import XGBClassifier
 from HADES.quiet_noise import suppress_output
 from HADES.featurize import Featurizer
 from HADES.correlation_drop import CorrDrop
-from HADES.ml_modeling import HPOptimizer
+from HADES.hyperparameter_optimization import HPOptimizer
 from HADES.param_spaces import default_param_spaces
 
 MODEL_REGISTRY = {
@@ -22,6 +22,22 @@ MODEL_REGISTRY = {
     "RandomForestClassifier": RandomForestClassifier,
     "HistGradientBoostingClassifier": HistGradientBoostingClassifier,
 }
+
+
+def _load_param_spaces(path, use_gpu):
+    """Load a custom param-spaces file. It must define either
+    `default_param_spaces(use_gpu)` (same signature as the built-in one)
+    or a plain `PARAM_SPACES` dict."""
+    spec = importlib.util.spec_from_file_location("custom_param_spaces", path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    if hasattr(module, "default_param_spaces"):
+        return module.default_param_spaces(use_gpu)
+    if hasattr(module, "PARAM_SPACES"):
+        return module.PARAM_SPACES
+    raise AttributeError(
+        f"'{path}' must define either `default_param_spaces(use_gpu)` or a `PARAM_SPACES` dict."
+    )
 
 
 class HADESTrainer:
@@ -76,6 +92,10 @@ class HADESTrainer:
         cb_weights = [len(y) / counts[c] for c in sorted(counts)]
         models = {}
         for name, ctor in MODEL_REGISTRY.items():
+            if name not in results:
+                # Allows a custom param_spaces file to train only a subset
+                # of MODEL_REGISTRY's models.
+                continue
             best = dict(results[name]["best_params"])
             best.setdefault("random_seed" if name == "CatBoostClassifier" else "random_state", self.random_state)
             if name == "CatBoostClassifier":
@@ -148,12 +168,19 @@ def main():
     p.add_argument("--use-gpu", action="store_true")
     p.add_argument("--reuse-hpo", action="store_true")
     p.add_argument("--overwrite", action="store_true")
+    p.add_argument("--param-spaces-file", default=None,
+                    help="Path to a .py file defining default_param_spaces(use_gpu) or "
+                         "a PARAM_SPACES dict, to override the built-in HPO search spaces.")
     args = p.parse_args()
 
     negative = None if args.negative_label.lower() == "none" else _parse_label(args.negative_label)
+    param_spaces = (_load_param_spaces(args.param_spaces_file, args.use_gpu)
+                     if args.param_spaces_file else None)
+
     HADESTrainer(output_dir=args.output_dir, smiles_col=args.smiles_col, label_col=args.label_col,
                  positive_label=_parse_label(args.positive_label), negative_label=negative,
-                 test_size=args.test_size, use_gpu=args.use_gpu, overwrite=args.overwrite
+                 test_size=args.test_size, use_gpu=args.use_gpu, param_spaces=param_spaces,
+                 overwrite=args.overwrite
                  ).run(args.input_csv, reuse_hpo=args.reuse_hpo)
 
 

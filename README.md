@@ -1,8 +1,8 @@
 # HADES
 
-HADES scores molecules (from SMILES strings) using an ensemble of five
-gradient-boosting / tree models. You can score molecules with the provided
-model, or train your own model on your own labelled compounds.
+HADES is a soft-voting ensemble of five ML models (HistGradientBoosting, RandomForest, CatBoost, XGBoost, and LightGBM) that returns a score for a given SMILES string.
+
+You can score molecules with the provided pretrained HADES model (https://doi.org/10.1021/acs.jcim.5c02953), or train your own model on your own labelled compounds.
 
 ## Requirements
 
@@ -24,15 +24,21 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 
 ```
 .
-├── HADES/                 # core package (Featurizer, CorrDrop, HPOptimizer)
-├── hades_calculator.py    # importable scorer (Jupyter/Python)
-├── HADES_csv.py           # score a CSV from the command line
-├── hades_pipeline.py      # train your own model + auto-generate a scorer
-├── HADES_saved_models/    # the provided trained ensemble (.pkl files)
-├── train_test_saved/      # feature columns the provided model expects
-├── environment.yml
-├── requirements.txt
-└── README.md
+├── HADES ┐                                     # core package
+          ├──correlation_drop.py                # drops highly correlated features
+          ├──featurize.py                       # featurizes given SMILES with Mordred, ADMET and QED features
+          ├──hyperparameter_optimization.py     # finds best hyperparameters using the Optuna algorithm (https://github.com/optuna/optuna)
+          ├──param_spaces.py                    # hyperparameter search space for Optuna
+          └──quiet_noise.py                     # silences warnings, tqdm bars, etc. for a cleaner console; can be disabled for debugging
+├── HADES_saved_models/                         # the trained ML models (.pkl files) for HADES_score
+├── train_test_saved/                           # split data used in the original paper
+├── HADES_CALCULATOR.py                          # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
+├── train_your_HADES.py                          # script to train your own HADES model on your own data
+├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
+├── environment.yml                             # defines the HADES conda environment
+├── requirements.txt                            # required libraries, packages, etc.
+├── data_to_test.csv                            # small sample dataframe for testing the project
+└── README.md                                   # description of the project and its usage
 ```
 
 ---
@@ -42,9 +48,9 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ### In a Jupyter notebook (or any Python session)
 
 ```python
-from hades_calculator import HADES
+from HADES_CALCULATOR import HADES_score
 
-hades = HADES()
+hades = HADES_score()
 hades.score(['CCCCSCC', 'c1ccccc1'])
 ```
 
@@ -54,14 +60,14 @@ hades.score(['CCCCSCC', 'c1ccccc1'])
 - a single **float** when you pass one SMILES string, e.g. `hades.score("CCO")`.
 
 Progress bars and library log messages are silenced by default. If you ever
-need to see them (for debugging), build with `HADES(quiet=False)`.
+need to see them (for debugging), instantiate with `HADES_score(quiet=False)`.
 
 ### From the command line (CSV in, CSV out)
 
 To score a whole file and get a new CSV with the scores added:
 
 ```bash
-python HADES_csv.py molecules_10.csv scored_molecules.csv --smiles-col SMILES
+python HADES_CALCULATOR.py -i input.csv -o output.csv --smiles-col SMILES
 ```
 
 The output CSV is your input file plus a `HADES_Score` column. Use
@@ -74,30 +80,30 @@ The output CSV is your input file plus a `HADES_Score` column. Use
 If you have your own dataset of positive- and negative-labelled molecules, you
 can train a new HADES ensemble on it.
 
-**Input:** a CSV with a SMILES column and a label column that marks which
+**Input:** a CSV with a SMILES column and a label column marking which
 compounds are positive and which are negative.
 
 ### Command line
 
 ```bash
-python hades_pipeline.py train my_data.csv -o my_model \
+python train_your_HADES.py -i my_data.csv -o output_dir \
     --smiles-col SMILES \
     --label-col activity \
     --positive-label active \
     --negative-label inactive
 ```
 
-`-o my_model` names the output folder. If you omit `-o`, you will be prompted
-to type a name. Everything for the run is written inside that folder:
+`-o output_dir` names the output folder. Everything for the run is written inside that folder:
 
 ```
 my_model/
+├── models                 # Saved ML models
 ├── config.json            # settings + the exact feature columns
-├── param_spaces.json      # the hyper-parameter search space used
 ├── hyperparameters.json   # best parameters found
-├── data/                  # train/test splits
-├── models/                # one .pkl per ensemble member
-└── score.py               # auto-generated scorer for THIS model
+├── X_test.parquet         # saved test set
+├── X_train.parquet        # saved train set
+├── y_test.csv             # saved test-set target values
+└── y_train.csv            # saved train-set target values
 ```
 
 Because each run has its own folder, training a new model never overwrites a
@@ -106,7 +112,7 @@ previous one.
 ### In a Jupyter notebook
 
 ```python
-from hades_pipeline import HADESTrainer
+from train_your_HADES import HADESTrainer
 
 HADESTrainer(
     output_dir="my_model",
@@ -117,38 +123,49 @@ HADESTrainer(
 ).run("my_data.csv")
 ```
 
-### Customise the hyper-parameter search (optional)
+### Customize the hyperparameter search (optional)
+
+If you want to run the hyperparameter search over a new parameter space, you can customize it as well.
+
+To use this from bash, set up a new `.py` file structured like `HADES/param_spaces.py` and pass it in on the command line. `parameters_test.py` is provided as a ready-made example you can use when training your own model:
 
 ```bash
-python hades_pipeline.py dump-config my_space.json   # write the default ranges
-# edit the ranges in my_space.json ...
-python hades_pipeline.py train my_data.csv -o my_model --param-config my_space.json
+python train_your_HADES.py -i data_to_test.csv -o quick_test_run --param-spaces-file parameters_test.py --overwrite
 ```
+```python
+from train_your_HADES import HADESTrainer
+from parameters_test import default_param_spaces
 
+small_param_spaces = default_param_spaces()  # or write/import your own parameters
+trainer = HADESTrainer(
+    output_dir="quick_test_run",
+    smiles_col="SMILES",
+    label_col="phase",
+    param_spaces=small_param_spaces,
+    overwrite=True,
+)
+out_dir = trainer.run("data_to_test.csv")
+```
 ---
 
 ## 3. Use a model you trained
 
-Every trained run folder contains its own `score.py`, which already knows which
-models and feature columns to use. Point it at a CSV of molecules:
+After training your own model, you can calculate a custom HADES_score from a Jupyter notebook or the terminal.
 
 ```bash
-python my_model/score.py new_molecules.csv scored.csv --smiles-col SMILES
+python HADES_CALCULATOR.py --models-dir my_model/models --x-train my_model/X_train.parquet -i data_to_test.csv -o scores.csv
 ```
 
-The output CSV is your input plus a `HADES_Score` column. The script finds the
-`HADES` package automatically (the path is recorded at training time, with a
-fallback that searches parent folders), so you do not need to copy `HADES` into
-the run folder — just keep the run folder inside the repo.
+```python
+from HADES_CALCULATOR import HADES_score
 
+custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_model/X_train.parquet")
+custom_hades.score(['C1CCCC1', 'c1ccccc1'])
+```
 
-write about quiet_noise.py like this
 ## Quiet Setup (`quiet_setup.py`)
 
 Suppresses noisy console output from `chemprop`, `admet_ai`, LightGBM, and `tqdm`
 progress bars during model loading and inference.
 
-**Usage:** Import it first, before any other heavy library:
-
-
-
+**Usage:** Import it first, before any other heavy library.
