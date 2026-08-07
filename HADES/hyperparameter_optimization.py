@@ -131,45 +131,9 @@ class HPOptimizer:
 
 		return results
 
-
-class MLModelEnsemble:
-
-	def __init__(self, opt_params_file):
-		self.opt_params_file = opt_params_file
-		with open(self.opt_params_file, "r") as f:
-			self.opt_params = json.load(f)
-		self.models = self.load_all_models()
-
-	def load_all_models(self):
-		models = {}
-		for model_name, model_params in self.opt_params_file.items():
-			models[model_name] = {}
-			models[model_name]['model'] = eval(model_name)(**model_params['best_params'])
-			models[model_name]['score'] = model_params['best_score']
-		return models
-
-	def get_best_model(self):
-		max_score = 0
-		for model_name, items in self.models.items():
-			if items['score'] > max_score:
-				max_score = items['score']
-				model = items['model']
-		return model
-
-	def fit_all(self, X, y):
-		for model_name, items in self.models.items():
-			items['model'].fit(X, y)
-
-	def predict_proba_ensemble(self, X):
-		preds = []
-		for model_name, items in self.models.items():
-			preds.append(items['model'].predict_proba(X)[:, 1])
-		return np.array(preds).mean(axis=1)
-
 if __name__ == "__main__":
 	# Define hyperparameter search spaces for different models
 	param_spaces = default_param_spaces(use_gpu=True)
-	# TODO: making pathing in a proper way
 	X_train = pd.read_parquet(r'/home/predator-3/PycharmProjects/QED-private/data/x_train')
 	y_train = pd.read_csv(r'/home/predator-3/PycharmProjects/QED-private/data/y_train.csv')
 	y_train = np.array(y_train == 4).reshape(-1, )
