@@ -5,7 +5,7 @@ import optuna
 from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score
 from optuna.exceptions import OptunaError
-from param_spaces import default_param_spaces
+from .param_spaces import default_param_spaces
 
 class HPOptimizer:
 	"""
