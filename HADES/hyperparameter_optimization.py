@@ -1,15 +1,8 @@
-import json
-import numpy as np
 import pandas as pd
 import optuna
 from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score
-from xgboost import XGBClassifier
-from lightgbm import LGBMClassifier
-from catboost import CatBoostClassifier
-from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from optuna.exceptions import OptunaError
-
 
 class HPOptimizer:
 	"""
@@ -136,103 +129,3 @@ class HPOptimizer:
 		return results
 
 
-class MLModelEnsemble:
-
-	def __init__(self, opt_params_file):
-		self.opt_params_file = opt_params_file
-		with open(self.opt_params_file, "r") as f:
-			self.opt_params = json.load(f)
-		self.models = self.load_all_models()
-
-	def load_all_models(self):
-		models = {}
-		for model_name, model_params in self.opt_params_file.items():
-			models[model_name] = {}
-			models[model_name]['model'] = eval(model_name)(**model_params['best_params'])
-			models[model_name]['score'] = model_params['best_score']
-		return models
-
-	def get_best_model(self):
-		max_score = 0
-		for model_name, items in self.models.items():
-			if items['score'] > max_score:
-				max_score = items['score']
-				model = items['model']
-		return model
-
-	def fit_all(self, X, y):
-		for model_name, items in self.models.items():
-			items['model'].fit(X, y)
-
-	def predict_proba_ensemble(self, X):
-		preds = []
-		for model_name, items in self.models.items():
-			preds.append(items['model'].predict_proba(X)[:, 1])
-		return np.array(preds).mean(axis=1)
-
-
-if __name__ == "__main__":
-	# Define hyperparameter search spaces for different models
-	param_spaces = {
-		RandomForestClassifier: {
-			"params": {
-				"n_estimators": ("int", 200, 1500, 100),
-				"max_features": ("categorical", ['sqrt', 'log2', 100, 200, 300]),
-				"max_depth": ("int", 2, 50, 2),
-				"criterion": ("categorical", ['gini', 'entropy', 'log_loss']),
-				"min_samples_split": ("int", 2, 20, 2),
-				"bootstrap": ("categorical", [True, False]),
-			},
-			"extra_args": {"n_jobs": -1, "random_state": 42},
-		},
-		HistGradientBoostingClassifier: {
-			"params": {
-				"max_iter": ("int", 200, 1500, 100),
-				"max_features": ("float", 0.3, 1.0),
-				"learning_rate": ("loguniform", 0.01, 0.5),
-				"max_depth": ("int", 2, 10, 1),
-				"max_bins": ("int", 63, 255, 16),
-				"min_samples_leaf": ("int", 1, 101, 2),
-			},
-			"extra_args": {"random_state": 42},
-		},
-		XGBClassifier: {
-			"params": {
-				"n_estimators": ("int", 200, 1500, 100),
-				"learning_rate": ("loguniform", 0.01, 0.5),
-				"max_depth": ("int", 2, 10, 1),
-				"subsample": ("float", 0.6, 1.0),
-				"colsample_bytree": ("float", 0.3, 1.0),
-			},
-			"extra_args": {"device": "cuda", "seed": 42},
-		},
-		CatBoostClassifier: {
-			"params": {
-				"iterations": ("int", 100, 5000, 100),
-				"learning_rate": ("loguniform", 0.01, 0.5),
-				"depth": ("int", 2, 10, 1),
-				"l2_leaf_reg": ("loguniform", 1, 5),
-				"border_count": ("int", 32, 128, 32),
-			},
-			"extra_args": {"verbose": 0, "task_type": "GPU", "devices": "0", "random_seed": 42},
-		},
-		LGBMClassifier: {
-			"params": {
-				"n_estimators": ("int", 200, 1500, 100),
-				"learning_rate": ("loguniform", 0.01, 0.5),
-				"max_depth": ("int", 2, 10, 1),
-				"num_leaves": ("int", 30, 100, 10),
-				"min_data_in_leaf": ("int", 5, 50, 5),
-			},
-			"extra_args": {"verbose": -1, "n_jobs": -1, "random_state": 42},
-		},
-	}
-	# TODO: making pathing in a proper way
-	X_train = pd.read_parquet(r'/home/predator-3/PycharmProjects/QED-private/data/x_train')
-	y_train = pd.read_csv(r'/home/predator-3/PycharmProjects/QED-private/data/y_train.csv')
-	y_train = np.array(y_train == 4).reshape(-1, )
-	optimize = HPOptimizer(param_spaces, X_train, y_train)
-	results = optimize.param_search()
-	print(results)
-	with open("optuna_results_final_old.json", "w") as f:
-		json.dump(results, f, indent=4)

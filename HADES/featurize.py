@@ -1,5 +1,3 @@
-# TODO: Should include th calculation of all features mordred, admet ai, QED, as well as removing invalid features
-
 import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import SaltRemover
@@ -26,60 +24,33 @@ ADMET_AI_FEATURES = ['logP', 'hydrogen_bond_acceptors', 'hydrogen_bond_donors',
 					 'Solubility_AqSolDB', 'VDss_Lombardo']
 
 
-
 def neutralize_atoms(mol): # I have changed it because old def crushed on boron atoms
-    """
-    Neutralize charges while avoiding atoms where this can create
-    invalid valences (e.g. boron).
-    """
-    pattern = Chem.MolFromSmarts(
-        "[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]"
-    )
+	"""
+	Neutralize charges while avoiding atoms where this can create invalid valences (e.g. boron).
+	Args:
+		mol: mol from rdkit
+	"""
+	pattern = Chem.MolFromSmarts(
+		"[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]"
+	)
+	at_matches = mol.GetSubstructMatches(pattern)
+	for (at_idx,) in at_matches:
+		atom = mol.GetAtomWithIdx(at_idx)
+		# Only neutralize N, O, P, S
+		if atom.GetAtomicNum() not in (7, 8, 15, 16):
+			continue
+		try:
+			chg = atom.GetFormalCharge()
+			hcount = atom.GetTotalNumHs()
+			atom.SetFormalCharge(0)
+			atom.SetNumExplicitHs(hcount - chg)
+			atom.UpdatePropertyCache()
+		except Exception as e:
+			print(f"{Chem.MolToSmiles(mol)} Failed during neutralization on atom {atom.GetSymbol()} at index {at_idx}")
+			print(e)
+			raise
+	return mol
 
-    at_matches = mol.GetSubstructMatches(pattern)
-
-    for (at_idx,) in at_matches:
-        atom = mol.GetAtomWithIdx(at_idx)
-
-        # Only neutralize N, O, P, S
-        if atom.GetAtomicNum() not in (7, 8, 15, 16):
-            continue
-
-        try:
-            chg = atom.GetFormalCharge()
-            hcount = atom.GetTotalNumHs()
-
-            atom.SetFormalCharge(0)
-            atom.SetNumExplicitHs(hcount - chg)
-            atom.UpdatePropertyCache()
-
-        except Exception as e:
-            print("=" * 80)
-            print("Failed during neutralization")
-            print("SMILES:", Chem.MolToSmiles(mol))
-            print("Atom index:", at_idx)
-            print("Atom:", atom.GetSymbol())
-            print(e)
-            print("=" * 80)
-            raise
-
-    return mol
-
-# def neutralize_atoms(mol):
-# 	# TODO: utils?
-# 	"""Neutralize charges, from rdkit.org/docs/Cookbook.html#neutralizing-molecules"""
-# 	pattern = Chem.MolFromSmarts("[+1!h0!$([*]~[-1,-2,-3,-4]),-1!$([*]~[+1,+2,+3,+4])]")
-# 	at_matches = mol.GetSubstructMatches(pattern)
-# 	at_matches_list = [y[0] for y in at_matches]
-# 	if len(at_matches_list) > 0:
-# 		for at_idx in at_matches_list:
-# 			atom = mol.GetAtomWithIdx(at_idx)
-# 			chg = atom.GetFormalCharge()
-# 			hcount = atom.GetTotalNumHs()
-# 			atom.SetFormalCharge(0)
-# 			atom.SetNumExplicitHs(hcount - chg)
-# 			atom.UpdatePropertyCache()
-# 	return mol
 
 
 class Featurizer:
@@ -146,9 +117,27 @@ class Featurizer:
 				admet_feats.append(col)
 		return mordred_feats, admet_feats, qed_feats
 
+	@classmethod
+	def from_columns(cls, columns):
+		"""
+		Builds a Featurizer that computes only the given feature names (e.g. X_train.columns),
+		instead of the full default Mordred/ADMET/QED set. Mordred names are matched by their
+		string representation; anything in ADMET_AI_FEATURES/QED_FEATURE_NAMES is routed there.
+		"""
+		cols = set(columns)
+		admet = [c for c in ADMET_AI_FEATURES if c in cols]
+		qed = [c for c in QED_FEATURE_NAMES if c in cols]
+		mordred_names = cols - set(admet) - set(qed)
+		mordred = [d for d in Calculator(descriptors, ignore_3D=True).descriptors if str(d) in mordred_names]
+		return cls(selected_mordred=mordred, selected_admet=admet, selected_qed=qed)
+
+	@property
+	def feature_names(self):
+		"""Column names this instance computes, in the order featurize_smiles/featurize_many_smiles emit them."""
+		return [str(d) for d in self.mordred_featurizer.descriptors] + self.selected_admet + self.selected_qed
+
 	@staticmethod
 	def standartize_mol(mol):
-		# TODO: utils?
 		"""
 		Standardizes a given molecule by removing salts, neutralizing atoms, and removing stereochemistry.
 
@@ -164,12 +153,13 @@ class Featurizer:
 		Chem.RemoveStereochemistry(neutralized_mol)
 		return neutralized_mol
 
-	def featurize_smiles(self, smiles):
+	def featurize_smiles(self, smiles, fillna=None):
 		"""
 		Computes features for a given SMILES string, including Mordred, ADMET AI, and QED features.
 
 		Args:
 		    smiles (str): A SMILES representation of the molecule.
+		    fillna: If not None, replaces any NaN/missing feature values with this value.
 
 		Returns:
 		    list: A list of computed features concatenated from Mordred, ADMET AI, and QED calculations.
@@ -191,14 +181,18 @@ class Featurizer:
 		qed_all_feature = calc_qed_properties(mol)._asdict()
 		qed_feature = [qed_all_feature[feature_name] for feature_name in self.selected_qed]
 
-		return mordred_feature + admet_feature + qed_feature
+		features = mordred_feature + admet_feature + qed_feature
+		if fillna is not None:
+			features = [fillna if pd.isna(v) else v for v in features]
+		return features
 
-	def featurize_many_smiles(self, smileses_list):
+	def featurize_many_smiles(self, smileses_list, fillna=None):
 		"""
 		Computes features for multiple SMILES strings and returns them as a pandas DataFrame.
 
 		Args:
 		    smileses_list (list of str): A list of SMILES strings representing molecules.
+		    fillna: If not None, replaces any NaN/missing feature values with this value.
 
 		Returns:
 		    pandas.DataFrame: A DataFrame containing computed features from Mordred, ADMET AI, and QED calculations.
@@ -223,10 +217,21 @@ class Featurizer:
 		qed_features = pd.DataFrame([calc_qed_properties(mol)._asdict() for mol in mols_list])
 		qed_features = qed_features[self.selected_qed]
 
-		return pd.concat([mordred_features, admet_features, qed_features], axis=1)
+		result = pd.concat([mordred_features, admet_features, qed_features], axis=1)
+		if fillna is not None:
+			result = result.fillna(fillna)
+		return result
 
 	@staticmethod
 	def drop_na_cols(data):
+		"""
+		drops columns with nan values.
+
+		Args:
+		    data: pandas DataFrame.
+		Returns:
+		    pandas.DataFrame: A DataFrame containing computed features from Mordred, ADMET AI, and QED calculations.
+		"""
 		return data[data.dtypes[data.dtypes != object].index]
 
 	@staticmethod
@@ -237,16 +242,3 @@ class Featurizer:
 			if val_counts.iloc[0] <= thresh:
 				keep_cols.append(col)
 		return data[keep_cols]
-
-
-if __name__ == '__main__':
-	featurizer = Featurizer()
-	print('model_loaded')
-	data = [i * 'C' for i in range(1, 100)]
-	data_featurized = featurizer.featurize_many_smiles(data)
-	na_dropped_data = featurizer.drop_na_cols(data_featurized)
-	same_val_dropped_data = featurizer.drop_same_val_cols(na_dropped_data)
-	print('Features created succesfully!')
-	with open('initial_columns', 'wb') as f:
-		pickle.dump(list(same_val_dropped_data.columns), f)
-	na_dropped_data.to_csv('initial_data_featurized.csv')

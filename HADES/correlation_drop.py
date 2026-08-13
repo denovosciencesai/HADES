@@ -3,7 +3,6 @@ from sklearn.base import clone
 from tqdm.auto import tqdm
 from sklearn.model_selection import cross_val_score
 
-
 class CorrDrop:
 	"""
 	A class to iteratively drop highly correlated features based on a correlation threshold
@@ -108,17 +107,3 @@ class CorrDrop:
 					  key=lambda x: x if type(x) == str else x.description()), opt_threshold
 
 
-if __name__ == '__main__':
-	from sklearn.ensemble import RandomForestClassifier  # For classification
-	import pandas as pd
-
-	X = pd.read_csv(r'initial_data_featurized.csv')
-	y = [0 for _ in range(1, 51)] + [1 for _ in range(51, 100)]
-	model_test = RandomForestClassifier(n_estimators=100, n_jobs=-1, random_state=42)
-	corrdrop = CorrDrop(model_test)
-	cv_thresh_dict_test, cv_thresh_std_dict_test = corrdrop.get_corr_threshold(X, y)
-	keep_cols_test, opt_threshold_test = corrdrop.get_cols_to_keep(X, cv_thresh_dict_test, cv_thresh_std_dict_test)
-	print('Non correlated columns determined correctly!')
-	print(f'Number of columns was reduced from: {X.shape[1]} to {len(keep_cols_test)}')
-	print(f'Optimal correlation threshold cutoff is: {opt_threshold_test}')
-	X[keep_cols_test].to_csv('initial_data_corrdropped.csv')
