@@ -4,6 +4,10 @@ from functools import partialmethod
 _silenced = False
 
 def silence_libraries():
+    """
+    Suppress warnings, tqdm progress bars, and logs from chemprop/train/admet_ai.
+    """
+
     global _silenced
     if _silenced:
         return
@@ -25,6 +29,10 @@ def silence_libraries():
 
 @contextlib.contextmanager
 def suppress_output():
+    """
+    Context manager that redirects stdout and stderr to devnull for the
+    duration of the block, then restores them.
+    """
     with open(os.devnull, "w") as devnull:
         with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
             yield

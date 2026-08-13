@@ -1,11 +1,8 @@
-import json
-import numpy as np
 import pandas as pd
 import optuna
 from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score
 from optuna.exceptions import OptunaError
-from .param_spaces import default_param_spaces
 
 class HPOptimizer:
 	"""
@@ -131,14 +128,4 @@ class HPOptimizer:
 
 		return results
 
-if __name__ == "__main__":
-	# Define hyperparameter search spaces for different models
-	param_spaces = default_param_spaces(use_gpu=True)
-	X_train = pd.read_parquet(r'/home/predator-3/PycharmProjects/QED-private/data/x_train')
-	y_train = pd.read_csv(r'/home/predator-3/PycharmProjects/QED-private/data/y_train.csv')
-	y_train = np.array(y_train == 4).reshape(-1, )
-	optimize = HPOptimizer(param_spaces, X_train, y_train)
-	results = optimize.param_search()
-	print(results)
-	with open("optuna_results_final_old.json", "w") as f:
-		json.dump(results, f, indent=4)
+

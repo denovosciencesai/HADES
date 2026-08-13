@@ -4,6 +4,17 @@ from xgboost import XGBClassifier
 from sklearn.ensemble import RandomForestClassifier,HistGradientBoostingClassifier
 
 def default_param_spaces(use_gpu: bool = False) -> dict:
+    """
+    Builds the default hyperparameter search spaces for the candidate model classes.
+
+    Args:
+        use_gpu (bool): If True, adds {"device": "cuda"} to XGBClassifier's extra_args
+            so it trains on GPU instead of CPU. Defaults to False.
+
+    Returns:
+        dict: A mapping of {model_class: {"params": dict, "extra_args": dict}} for each
+            of the five supported classifiers.
+    """
     xgb_extra = {"seed": 42}
     if use_gpu:
         xgb_extra["device"] = "cuda"

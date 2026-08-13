@@ -1,11 +1,18 @@
-# small_param_spaces.py
 from sklearn.ensemble import RandomForestClassifier, HistGradientBoostingClassifier
 from xgboost import XGBClassifier
 from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
 
 
-def default_param_spaces(use_gpu: bool = False) -> dict:
+def custom_param_spaces(use_gpu: bool = False) -> dict:
+    """
+    parameters for hyperparameters search, can be changed to get custom ones
+    Args:
+        use_gpu (bool): Currently unused (kept for interface parity with
+            `default_param_spaces`)
+    Returns:
+        dict: A mapping of {model_class: {"params": dict, "extra_args": dict}} for each
+            of the five supported classifiers.    """
     return {
         RandomForestClassifier: {
             "params": {

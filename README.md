@@ -134,9 +134,9 @@ python train_your_HADES.py -i data_to_test.csv -o quick_test_run --param-spaces-
 ```
 ```python
 from train_your_HADES import HADESTrainer
-from parameters_test import default_param_spaces
+from parameters_test import custom_param_spaces
 
-small_param_spaces = default_param_spaces()  # or write/import your own parameters
+small_param_spaces = custom_param_spaces()  # or write/import your own parameters
 trainer = HADESTrainer(
     output_dir="quick_test_run",
     smiles_col="SMILES",
@@ -163,7 +163,7 @@ custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_mod
 custom_hades.score(['C1CCCC1', 'c1ccccc1'])
 ```
 
-## Quiet Setup (`quiet_setup.py`)
+## Quiet Setup (`quiet_noise.py`)
 
 Suppresses noisy console output from `chemprop`, `admet_ai`, LightGBM, and `tqdm`
 progress bars during model loading and inference.

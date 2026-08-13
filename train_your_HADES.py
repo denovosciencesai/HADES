@@ -23,7 +23,6 @@ MODEL_REGISTRY = {
     "HistGradientBoostingClassifier": HistGradientBoostingClassifier,
 }
 
-
 def _load_param_spaces(path, use_gpu):
     """Load a custom param-spaces file. It must define either
     `default_param_spaces(use_gpu)` (same signature as the built-in one)
@@ -39,11 +38,39 @@ def _load_param_spaces(path, use_gpu):
         f"'{path}' must define either `default_param_spaces(use_gpu)` or a `PARAM_SPACES` dict."
     )
 
-
 class HADESTrainer:
+    """
+    End-to-end trainer for a HADES model ensemble: loads labeled SMILES data,
+    featurizes it, drops correlated/uninformative descriptors, runs hyperparameter
+    optimization for each model in MODEL_REGISTRY, fits the final ensemble, and
+    persists everything (models, train/test splits, HPO results, and run config)
+    needed to later score new molecules with `HADES_score`.
+    """
     def __init__(self, output_dir=None, smiles_col="SMILES", label_col="phase",
                  positive_label=4, negative_label=0, test_size=0.2, random_state=42,
                  use_gpu=False, param_spaces=None, overwrite=False):
+
+        """
+        Args:
+            output_dir (str, optional): Directory to write run outputs to. Defaults
+                to a timestamped `hades_run_<YYYYmmdd_HHMMSS>` directory.
+            smiles_col (str): Name of the column containing SMILES strings.
+            label_col (str): Name of the column containing class labels used to
+                derive the binary training target.
+            positive_label: Value in `label_col` treated as the positive class.
+            negative_label: Value in `label_col` treated as the negative class.
+                If None, every row not equal to `positive_label` is treated as
+                negative (no filtering is applied).
+            test_size (float): Fraction of data held out for the test split.
+            random_state (int): Seed used for splitting, feature selection, and
+                model training.
+            use_gpu (bool): Passed to the default param spaces to enable GPU
+                training (e.g. XGBoost on CUDA), if `param_spaces` is not given.
+            param_spaces (dict, optional): Custom hyperparameter search spaces,
+                keyed by model class. Defaults to `default_param_spaces(use_gpu)`.
+            overwrite (bool): If True, allows writing into an existing
+                `output_dir`. Defaults to False.
+        """
         self.output_dir = output_dir or f"hades_run_{dt.datetime.now():%Y%m%d_%H%M%S}"
         self.smiles_col, self.label_col = smiles_col, label_col
         self.positive_label, self.negative_label = positive_label, negative_label
@@ -54,12 +81,32 @@ class HADESTrainer:
             self.featurizer = Featurizer()
 
     def _make_dirs(self):
+        """
+        Creates the output directory (and its `models` subdirectory).
+        Raises:
+            FileExistsError: If `self.output_dir` already exists and
+                `self.overwrite` is False.
+        Returns:
+            str: The output directory path.
+        """
         if os.path.exists(self.output_dir) and not self.overwrite:
             raise FileExistsError(f"'{self.output_dir}' exists; pass overwrite=True.")
         os.makedirs(os.path.join(self.output_dir, "models"), exist_ok=True)
         return self.output_dir
 
     def _load_data(self, csv_path):
+        """
+        Loads and validates the training CSV, deriving a binary `_target` column.
+        Args:
+            csv_path (str): Path to the input training CSV.
+        Raises:
+            KeyError: If `smiles_col` or `label_col` is missing from the CSV.
+            ValueError: If fewer than two classes remain in `_target` after
+                filtering.
+        Returns:
+            pd.DataFrame: The (possibly filtered) DataFrame with the added
+                `_target` column.
+        """
         df = pd.read_csv(csv_path)
         for c in (self.smiles_col, self.label_col):
             if c not in df.columns:
@@ -72,6 +119,18 @@ class HADESTrainer:
         return df
 
     def _featurize(self, df):
+        """
+        Computes molecular descriptors for every SMILES in `df` and drops
+        uninformative columns.
+        Featurizes `df[self.smiles_col]` in bulk, then drops columns that are
+        all-NaN or constant across rows.
+        Args:
+            df (pd.DataFrame): DataFrame containing the SMILES column to
+                featurize.
+        Returns:
+            pd.DataFrame: Feature matrix with string-typed column names, indexed
+                to match the rows that were successfully featurized.
+        """
         with suppress_output():
             feats = self.featurizer.featurize_many_smiles(df[self.smiles_col])
         feats = self.featurizer.drop_same_val_cols(self.featurizer.drop_na_cols(feats))
@@ -80,12 +139,32 @@ class HADESTrainer:
 
     @staticmethod
     def _select_features(X, y, random_state):
+        """
+        Selects a feature subset by dropping highly-correlated descriptors.
+        Args:
+            X (pd.DataFrame): Training feature matrix.
+            y: Training labels.
+            random_state (int): Seed for the underlying RandomForestClassifier.
+        Returns:
+            tuple[list, float]: The list of column names to keep, and the
+                optimal correlation threshold used to select them.
+        """
         corrdrop = CorrDrop(RandomForestClassifier(n_estimators=1000, n_jobs=-1, random_state=random_state))
         thresh, thresh_std = corrdrop.get_corr_threshold(X, y)
         keep_cols, opt_threshold = corrdrop.get_cols_to_keep(X, thresh, thresh_std)
         return list(keep_cols), float(opt_threshold)
 
     def _train_ensemble(self, X, y, results):
+        """
+        Fits one model per entry in `results` using its best hyperparameters.
+        Args:
+            X: Training feature matrix.
+            y: Training labels (coerced to int).
+            results (dict): Mapping of model name -> {"best_params": dict, ...},
+                as produced by `HPOptimizer.param_search`.
+        Returns:
+            dict[str, object]: Mapping of model name to its fitted estimator.
+        """
         y = list(map(int, y))
         weights = compute_sample_weight("balanced", y=y)
         counts = Counter(y)
@@ -107,6 +186,16 @@ class HADESTrainer:
         return models
 
     def run(self, csv_path, reuse_hpo=False):
+        """
+        Runs the full training pipeline end to end and writes all outputs to disk.
+        Args:
+            csv_path (str): Path to the input training CSV.
+            reuse_hpo (bool): If True and a `hyperparameters.json` already exists
+                in the output directory, loads those results instead of re-running
+                hyperparameter search. Defaults to False.
+        Returns:
+            str: The output directory containing all run artifacts.
+        """
         out = self._make_dirs()
         df = self._load_data(csv_path)
         feats = self._featurize(df)
@@ -148,15 +237,25 @@ class HADESTrainer:
         print(f"Done. Score with: HADES_score(models_dir='{out}/models', x_train_parquet='{out}/X_train.parquet')")
         return out
 
-
 def _parse_label(v):
+    """
+    Attempts to parse a label value as an int, falling back to the original
+    string if conversion fails.
+    Args:
+        v (str): Raw label value, typically from the command line.
+    Returns:
+        int or str: The parsed integer, or the original string if it isn't
+            numeric.
+    """
     try:
         return int(v)
     except ValueError:
         return v
 
-
 def main():
+    """
+    Command-line entry point for training a HADES ensemble.
+    """
     p = argparse.ArgumentParser(description="Train a HADES ensemble.")
     p.add_argument("-i", "--input", dest="input_csv", required=True)
     p.add_argument("-o", "--output-dir", default=None)
@@ -182,7 +281,6 @@ def main():
                  test_size=args.test_size, use_gpu=args.use_gpu, param_spaces=param_spaces,
                  overwrite=args.overwrite
                  ).run(args.input_csv, reuse_hpo=args.reuse_hpo)
-
 
 if __name__ == "__main__":
     main()

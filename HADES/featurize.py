@@ -224,6 +224,14 @@ class Featurizer:
 
 	@staticmethod
 	def drop_na_cols(data):
+		"""
+		drops columns with nan values.
+
+		Args:
+		    data: pandas DataFrame.
+		Returns:
+		    pandas.DataFrame: A DataFrame containing computed features from Mordred, ADMET AI, and QED calculations.
+		"""
 		return data[data.dtypes[data.dtypes != object].index]
 
 	@staticmethod
@@ -234,16 +242,3 @@ class Featurizer:
 			if val_counts.iloc[0] <= thresh:
 				keep_cols.append(col)
 		return data[keep_cols]
-
-
-if __name__ == '__main__':
-	featurizer = Featurizer()
-	print('model_loaded')
-	data = [i * 'C' for i in range(1, 100)]
-	data_featurized = featurizer.featurize_many_smiles(data)
-	na_dropped_data = featurizer.drop_na_cols(data_featurized)
-	same_val_dropped_data = featurizer.drop_same_val_cols(na_dropped_data)
-	print('Features created succesfully!')
-	with open('initial_columns', 'wb') as f:
-		pickle.dump(list(same_val_dropped_data.columns), f)
-	na_dropped_data.to_csv('initial_data_featurized.csv')
