@@ -23,7 +23,7 @@ hades_run_*/
 # Data files are ignored by default. To ship a small test set (e.g. the example
 # molecules), whitelist it with a line like:  !molecules_10.csv
 *.csv
-!molecules_10.csv
+!data_to_test.csv
 
 # ---- OS ----
 .DS_Store
