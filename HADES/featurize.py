@@ -77,7 +77,6 @@ class Featurizer:
 		    selected_qed (list, optional): A list of selected QED features. Defaults to None.
 		    features_pkl (str, optional): Path to a pickle file containing preselected features. Defaults to None.
 		"""
-		# TODO: reconstruct methods to consider where admet ai or qed features are not used
 		if features_pkl:
 			selected_mordred, selected_admet, selected_qed = self.load_features(features_pkl)
 
