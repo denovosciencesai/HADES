@@ -8,7 +8,7 @@
 # far more reliably that way than through pip. Everything else is pinned in
 # requirements.txt and installed with pip.
 
-name: hades-clean
+name: hades
 channels:
   - conda-forge
 dependencies:
