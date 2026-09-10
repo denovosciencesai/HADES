@@ -1,8 +1,9 @@
+from HADES.quiet_noise import suppress_output
+from HADES.featurize import Featurizer
+
 import argparse, contextlib, glob, os
 from typing import Union
 import joblib, numpy as np, pandas as pd
-from HADES.quiet_noise import suppress_output
-from HADES.featurize import Featurizer
 
 
 class HADES_score:
@@ -58,13 +59,14 @@ class HADES_score:
         Args:
             smiles_list (list[str]): SMILES strings to featurize.
         Returns:
-            pd.DataFrame: Feature matrix with one row per input SMILES and columns
-                matching `self.descriptor_cols`.
+            pd.DataFrame: Feature matrix with columns matching `self.descriptor_cols`.
+                Unparseable SMILES get no row; the index gives their position in
+                `smiles_list`.
         """
         with self._q():
             if len(smiles_list) == 1:
-                feats = self.featurizer.featurize_smiles(smiles_list[0]) or [float("nan")] * len(self._feature_names)
-                df = pd.DataFrame([feats], columns=self._feature_names)
+                feats = self.featurizer.featurize_smiles(smiles_list[0])
+                df = pd.DataFrame([feats] if feats else [], columns=self._feature_names)
             else:
                 df = self.featurizer.featurize_many_smiles(smiles_list)
         df.columns = df.columns.astype(str)
@@ -85,14 +87,26 @@ class HADES_score:
         Returns:
             float: The averaged HADES score, if `smiles` is a single string.
             pd.DataFrame: A DataFrame with "SMILES" and "HADES_Score" columns,
-                if `smiles` is a list.
+                if `smiles` is a list. Unparseable SMILES are skipped and listed
+                on stdout.
+        Raises:
+            ValueError: If `smiles` is a single string that RDKit cannot parse.
         """
         single = isinstance(smiles, str)
         smiles_list = [smiles] if single else list(smiles)
         with self._q():
             X = self._featurize(smiles_list)
-            scores = np.mean([m.predict_proba(X)[:, 1] for m in self.models.values()], axis=0)
-        return float(scores[0]) if single else pd.DataFrame({"SMILES": smiles_list, "HADES_Score": scores})
+            scores = (np.mean([m.predict_proba(X)[:, 1] for m in self.models.values()], axis=0)
+                      if len(X) else np.array([]))
+        kept = list(X.index)
+        bad = [s for i, s in enumerate(smiles_list) if i not in set(kept)]
+        if single:
+            if bad:
+                raise ValueError(f"Not a valid SMILES: {smiles!r}")
+            return float(scores[0])
+        if bad:
+            print(f"Could not calculate {len(bad)} SMILES: {bad}")
+        return pd.DataFrame({"SMILES": [smiles_list[i] for i in kept], "HADES_Score": scores})
 
     def score_csv(self, input_csv, output_csv, smiles_col="SMILES"):
         """
