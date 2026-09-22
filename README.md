@@ -64,6 +64,35 @@ Progress bars and library log messages are silenced by default. For debugging,
 stay off either way: importing `HADES.quiet_noise` disables `tqdm` for the whole
 process, and nothing re-enables it.
 
+### Invalid SMILES
+
+RDKit cannot parse every string. What happens depends on how you call `score()`:
+
+- **A single SMILES** raises `ValueError`, because there is no sensible number to
+  return for one molecule that does not exist:
+
+  ```python
+  hades.score("NOT_A_SMILES")
+  # ValueError: Not a valid SMILES: 'NOT_A_SMILES'
+  ```
+
+- **A list** skips the unparseable ones, scores the rest, and reports what it
+  skipped. The returned DataFrame contains only the molecules that were scored,
+  so it can be shorter than the input:
+
+  ```python
+  hades.score(["CCCC", "NOT_A_SMILES", "CCO"])
+  # Could not calculate 1 SMILES: ['NOT_A_SMILES']
+  #    SMILES  HADES_Score
+  #      CCCC     0.000458
+  #       CCO     0.017847
+  ```
+
+  If nothing parses, you get an empty DataFrame rather than an error.
+
+The report is printed even with the default `quiet=True`, so molecules never
+disappear silently.
+
 ### From the command line (CSV in, CSV out)
 
 To score a whole file and get a new CSV with the scores added:
@@ -74,6 +103,9 @@ python HADES_CALCULATOR.py -i data_to_test.csv -o output.csv --smiles-col SMILES
 
 The output CSV is your input file plus a `HADES_Score` column. Use
 `--smiles-col` to name the column that holds the SMILES if it is not `SMILES`.
+
+Every input row is kept. Rows whose SMILES could not be parsed get an empty
+`HADES_Score`, and the run prints which ones they were.
 
 ---
 
@@ -110,6 +142,9 @@ output_dir/
 
 Because each run has its own folder, training a new model never overwrites a
 previous one.
+
+Molecules whose SMILES cannot be parsed are dropped before training, and step
+2/6 reports how many. Labels stay matched to the molecules that survived.
 
 ### In a Jupyter notebook
 

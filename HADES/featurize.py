@@ -25,6 +25,52 @@ ADMET_AI_FEATURES = ['logP', 'hydrogen_bond_acceptors', 'hydrogen_bond_donors',
 					 'Solubility_AqSolDB', 'VDss_Lombardo']
 
 
+def unscoreable_reason(smiles):
+	"""
+	Reports whether a SMILES string describes a molecule the HADES models can score.
+
+	RDKit parses more than whole molecules: an empty string yields an atomless mol,
+	and R-group fragments such as 'OC(O)(O)C(O)(S)[*:6]' parse fine because a dummy
+	atom ('*' / '[*:n]' attachment point) is a legal atom. Neither is scoreable --
+	the training set contains no dummy atoms, and roughly a third of the Mordred
+	descriptors come back NaN for such a fragment, so the pipeline's mean-imputation
+	would quietly turn a failed featurization into a confident-looking score.
+
+	Args:
+	    smiles (str): A SMILES representation of the molecule.
+
+	Returns:
+	    str or None: A short phrase explaining why the SMILES cannot be scored,
+	        or None if it can.
+	"""
+	mol = Chem.MolFromSmiles(smiles)
+	if mol is None:
+		return "RDKit cannot parse it"
+	if mol.GetNumAtoms() == 0:
+		return "it contains no atoms"
+	if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
+		return "it is a fragment with attachment points (dummy atoms), not a whole molecule"
+	return None
+
+
+def parse_scoreable_mol(smiles):
+	"""
+	Parses a SMILES string, returning None (with a warning) if it cannot be scored.
+
+	Args:
+	    smiles (str): A SMILES representation of the molecule.
+
+	Returns:
+	    rdkit.Chem.rdchem.Mol or None: The parsed molecule, or None when
+	        `unscoreable_reason` rejects it.
+	"""
+	reason = unscoreable_reason(smiles)
+	if reason is not None:
+		print(f"Warning: cannot score SMILES '{smiles}': {reason}")
+		return None
+	return Chem.MolFromSmiles(smiles)
+
+
 def neutralize_atoms(mol): # I have changed it because old def crushed on boron atoms
 	"""
 	Neutralize charges while avoiding atoms where this can create invalid valences (e.g. boron).
@@ -166,10 +212,9 @@ class Featurizer:
 		    list: A list of computed features concatenated from Mordred, ADMET AI, and QED calculations.
 		"""
 
-		mol = Chem.MolFromSmiles(smiles)
+		mol = parse_scoreable_mol(smiles)
 		if mol is None:
-			# Return an empty list if SMILES is invalid
-			print(f"Warning: Invalid SMILES string '{smiles}'")
+			# Return an empty list if the SMILES is not a scoreable molecule
 			return []
 		mol = self.standartize_mol(mol)
 		smiles = Chem.MolToSmiles(mol)
@@ -211,9 +256,8 @@ class Featurizer:
 
 		valid_index, valid_smileses_list, mols_list = [], [], []
 		for idx, smiles in zip(index, smileses_list):
-			mol = Chem.MolFromSmiles(smiles)
-			if not mol:
-				print(f"Warning: Invalid SMILES string '{smiles}'")
+			mol = parse_scoreable_mol(smiles)
+			if mol is None:
 				continue
 			mol = self.standartize_mol(mol)
 			mols_list.append(mol)

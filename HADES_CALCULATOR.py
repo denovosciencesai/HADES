@@ -1,5 +1,5 @@
 from HADES.quiet_noise import suppress_output
-from HADES.featurize import Featurizer
+from HADES.featurize import Featurizer, unscoreable_reason
 
 import argparse, contextlib, glob, os
 from typing import Union
@@ -90,7 +90,9 @@ class HADES_score:
                 if `smiles` is a list. Unparseable SMILES are skipped and listed
                 on stdout.
         Raises:
-            ValueError: If `smiles` is a single string that RDKit cannot parse.
+            ValueError: If `smiles` is a single string that is not a scoreable
+                molecule -- unparseable, atomless, or a fragment carrying dummy-atom
+                attachment points (see `unscoreable_reason`).
         """
         single = isinstance(smiles, str)
         smiles_list = [smiles] if single else list(smiles)
@@ -102,7 +104,9 @@ class HADES_score:
         bad = [s for i, s in enumerate(smiles_list) if i not in set(kept)]
         if single:
             if bad:
-                raise ValueError(f"Not a valid SMILES: {smiles!r}")
+                # The featurizer's warning is swallowed when quiet=True, so restate the reason here.
+                reason = unscoreable_reason(smiles) or "featurization failed"
+                raise ValueError(f"Cannot score {smiles!r}: {reason}")
             return float(scores[0])
         if bad:
             print(f"Could not calculate {len(bad)} SMILES: {bad}")
