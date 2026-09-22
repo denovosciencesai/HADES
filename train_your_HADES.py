@@ -1,4 +1,10 @@
-import argparse, datetime as dt, json, os, importlib.util
+from HADES.quiet_noise import suppress_output
+from HADES.featurize import Featurizer
+from HADES.correlation_drop import CorrDrop
+from HADES.hyperparameter_optimization import HPOptimizer
+from HADES.param_spaces import default_param_spaces
+
+import argparse, datetime as dt, json, os, time, importlib.util
 from collections import Counter
 
 import joblib, numpy as np, pandas as pd
@@ -9,12 +15,6 @@ from catboost import CatBoostClassifier
 from lightgbm import LGBMClassifier
 from xgboost import XGBClassifier
 
-from HADES.quiet_noise import suppress_output
-from HADES.featurize import Featurizer
-from HADES.correlation_drop import CorrDrop
-from HADES.hyperparameter_optimization import HPOptimizer
-from HADES.param_spaces import default_param_spaces
-
 MODEL_REGISTRY = {
     "XGBClassifier": XGBClassifier,
     "CatBoostClassifier": CatBoostClassifier,
@@ -23,19 +23,32 @@ MODEL_REGISTRY = {
     "HistGradientBoostingClassifier": HistGradientBoostingClassifier,
 }
 
+def _step(label):
+    """Announce a pipeline stage and return its start time."""
+    print(f"  {label} ...", flush=True)
+    return time.time()
+
+def _done(t0, note):
+    """Report how long the stage took, and what it produced."""
+    elapsed = time.time() - t0
+    mins, secs = divmod(int(elapsed), 60)
+    print(f"      -> {note}  [{mins}m {secs}s]" if mins else f"      -> {note}  [{secs}s]", flush=True)
+
 def _load_param_spaces(path, use_gpu):
-    """Load a custom param-spaces file. It must define either
-    `default_param_spaces(use_gpu)` (same signature as the built-in one)
-    or a plain `PARAM_SPACES` dict."""
+    """Load a custom param-spaces file. It must define a
+    `default_param_spaces(use_gpu)` or `custom_param_spaces(use_gpu)` function
+    (same signature as the built-in one), or a plain `PARAM_SPACES` dict."""
     spec = importlib.util.spec_from_file_location("custom_param_spaces", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    if hasattr(module, "default_param_spaces"):
-        return module.default_param_spaces(use_gpu)
+    for name in ("default_param_spaces", "custom_param_spaces"):
+        if hasattr(module, name):
+            return getattr(module, name)(use_gpu)
     if hasattr(module, "PARAM_SPACES"):
         return module.PARAM_SPACES
     raise AttributeError(
-        f"'{path}' must define either `default_param_spaces(use_gpu)` or a `PARAM_SPACES` dict."
+        f"'{path}' must define `default_param_spaces(use_gpu)`, "
+        f"`custom_param_spaces(use_gpu)`, or a `PARAM_SPACES` dict."
     )
 
 class HADESTrainer:
@@ -169,18 +182,24 @@ class HADESTrainer:
         weights = compute_sample_weight("balanced", y=y)
         counts = Counter(y)
         cb_weights = [len(y) / counts[c] for c in sorted(counts)]
+        # HPO ran each model with its param space's extra_args, but best_params does
+        # not carry them. Without merging them back the final fit is not the model
+        # that was selected -- n_jobs, verbose and device settings would all be lost.
+        extra_args = {cls.__name__: spec.get("extra_args", {}) for cls, spec in self.param_spaces.items()}
         models = {}
         for name, ctor in MODEL_REGISTRY.items():
             if name not in results:
                 # Allows a custom param_spaces file to train only a subset
                 # of MODEL_REGISTRY's models.
                 continue
-            best = dict(results[name]["best_params"])
+            best = {**extra_args.get(name, {}), **results[name]["best_params"]}
             best.setdefault("random_seed" if name == "CatBoostClassifier" else "random_state", self.random_state)
             if name == "CatBoostClassifier":
-                models[name] = ctor(class_weights=cb_weights, verbose=0, **best).fit(X, y)
+                best.setdefault("verbose", 0)
+                models[name] = ctor(class_weights=cb_weights, **best).fit(X, y)
             elif name == "XGBClassifier":
-                models[name] = ctor(eval_metric="logloss", **best).fit(X, y, sample_weight=weights)
+                best.setdefault("eval_metric", "logloss")
+                models[name] = ctor(**best).fit(X, y, sample_weight=weights)
             else:
                 models[name] = ctor(**best).fit(X, y, sample_weight=weights)
         return models
@@ -197,28 +216,44 @@ class HADESTrainer:
             str: The output directory containing all run artifacts.
         """
         out = self._make_dirs()
+        t0 = _step("1/6 Loading data")
         df = self._load_data(csv_path)
+        n_pos = int(df["_target"].sum())
+        _done(t0, f"{len(df)} molecules ({n_pos} positive, {len(df) - n_pos} negative)")
+
+        t0 = _step("2/6 Featurizing (Mordred + ADMET-AI + QED)")
         feats = self._featurize(df)
+        dropped = len(df) - len(feats)
+        note = f"{len(feats)} molecules, {feats.shape[1]} descriptors"
+        _done(t0, note + (f" -- {dropped} SMILES could not be parsed" if dropped else ""))
         y, smiles = df["_target"].loc[feats.index], df[self.smiles_col].loc[feats.index]
 
         X_train, X_test, y_train, y_test, smi_train, smi_test = train_test_split(
             feats, y, smiles, test_size=self.test_size, random_state=self.random_state, stratify=y)
+        print(f"  3/6 Split ......... {len(X_train)} train / {len(X_test)} test", flush=True)
 
+        t0 = _step(f"4/6 Selecting features from {X_train.shape[1]} descriptors (slowest step)")
         keep_cols, opt_threshold = self._select_features(X_train, y_train, self.random_state)
         X_train, X_test = X_train[keep_cols].astype(float), X_test[keep_cols].astype(float)
+        _done(t0, f"kept {len(keep_cols)} descriptors (correlation threshold {opt_threshold:.2f})")
 
         hpo_path = os.path.join(out, "hyperparameters.json")
         if reuse_hpo and os.path.exists(hpo_path):
             with open(hpo_path) as f:
                 results = json.load(f)
+            print(f"  5/6 Hyperparameter search ... reused {hpo_path}", flush=True)
         else:
+            t0 = _step(f"5/6 Hyperparameter search over {len(self.param_spaces)} models")
             results = HPOptimizer(self.param_spaces, X_train, np.asarray(y_train)).param_search()
             with open(hpo_path, "w") as f:
                 json.dump(results, f, indent=4)
+            _done(t0, f"{len(results)} models tuned")
 
+        t0 = _step(f"6/6 Fitting final ensemble")
         models = self._train_ensemble(X_train, y_train, results)
         for name, model in models.items():
             joblib.dump(model, os.path.join(out, "models", f"{name}.pkl"))
+        _done(t0, f"{len(models)} models saved to {os.path.join(out, 'models')}")
 
         xtr, xte = X_train.copy(), X_test.copy()
         xtr["SMILES"], xte["SMILES"] = smi_train.values, smi_test.values
@@ -269,7 +304,8 @@ def main():
     p.add_argument("--overwrite", action="store_true")
     p.add_argument("--param-spaces-file", default=None,
                     help="Path to a .py file defining default_param_spaces(use_gpu) or "
-                         "a PARAM_SPACES dict, to override the built-in HPO search spaces.")
+                         "custom_param_spaces(use_gpu) or a PARAM_SPACES dict, to override "
+                         "the built-in HPO search spaces.")
     args = p.parse_args()
 
     negative = None if args.negative_label.lower() == "none" else _parse_label(args.negative_label)

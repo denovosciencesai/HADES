@@ -4,6 +4,10 @@ from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score
 from optuna.exceptions import OptunaError
 
+# Optuna logs every trial at INFO through its own logger, which floods the console
+# during training. Only warnings and errors get through.
+optuna.logging.set_verbosity(optuna.logging.WARNING)
+
 class HPOptimizer:
 	"""
 		A class for performing hyperparameter optimization using Optuna.

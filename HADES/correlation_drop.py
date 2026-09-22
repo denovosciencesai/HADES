@@ -40,7 +40,10 @@ class CorrDrop:
 		X_drop = X.copy()
 		cv_thresh_dict = {}
 		cv_thresh_std_dict = {}
-		for threshold in tqdm(np.linspace(0.99, 0.01, 99)):
+		# disable=False overrides the process-wide tqdm silencing from quiet_noise:
+		# this loop is the slowest step in training, so it needs to show progress.
+		for threshold in tqdm(np.linspace(0.99, 0.01, 99), desc="      correlation threshold",
+							  disable=False, leave=False):
 			corr_data_norm, drop_columns = self.drop_corr_columns(corr_data_norm, threshold)
 			X_drop.drop(columns=drop_columns, inplace=True)
 			# Temporarily rename columns as strings for sklearn compatibility

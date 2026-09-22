@@ -59,19 +59,53 @@ hades.score(['CCCCSCC', 'c1ccccc1'])
 - a **DataFrame** (columns `SMILES`, `HADES_Score`) when you pass a list of SMILES,
 - a single **float** when you pass one SMILES string, e.g. `hades.score("CCO")`.
 
-Progress bars and library log messages are silenced by default. If you ever
-need to see them (for debugging), instantiate with `HADES_score(quiet=False)`.
+Progress bars and library log messages are silenced by default. For debugging,
+`HADES_score(quiet=False)` brings back the library log messages. Progress bars
+stay off either way: importing `HADES.quiet_noise` disables `tqdm` for the whole
+process, and nothing re-enables it.
+
+### Invalid SMILES
+
+RDKit cannot parse every string. What happens depends on how you call `score()`:
+
+- **A single SMILES** raises `ValueError`, because there is no sensible number to
+  return for one molecule that does not exist:
+
+  ```python
+  hades.score("NOT_A_SMILES")
+  # ValueError: Not a valid SMILES: 'NOT_A_SMILES'
+  ```
+
+- **A list** skips the unparseable ones, scores the rest, and reports what it
+  skipped. The returned DataFrame contains only the molecules that were scored,
+  so it can be shorter than the input:
+
+  ```python
+  hades.score(["CCCC", "NOT_A_SMILES", "CCO"])
+  # Could not calculate 1 SMILES: ['NOT_A_SMILES']
+  #    SMILES  HADES_Score
+  #      CCCC     0.000458
+  #       CCO     0.017847
+  ```
+
+  If nothing parses, you get an empty DataFrame rather than an error.
+
+The report is printed even with the default `quiet=True`, so molecules never
+disappear silently.
 
 ### From the command line (CSV in, CSV out)
 
 To score a whole file and get a new CSV with the scores added:
 
 ```bash
-python HADES_CALCULATOR.py -i input.csv -o output.csv --smiles-col SMILES
+python HADES_CALCULATOR.py -i data_to_test.csv -o output.csv --smiles-col SMILES
 ```
 
 The output CSV is your input file plus a `HADES_Score` column. Use
 `--smiles-col` to name the column that holds the SMILES if it is not `SMILES`.
+
+Every input row is kept. Rows whose SMILES could not be parsed get an empty
+`HADES_Score`, and the run prints which ones they were.
 
 ---
 
@@ -86,17 +120,17 @@ compounds are positive and which are negative.
 ### Command line
 
 ```bash
-python train_your_HADES.py -i my_data.csv -o output_dir \
+python train_your_HADES.py -i data_to_test.csv -o output_dir \
     --smiles-col SMILES \
-    --label-col activity \
-    --positive-label active \
-    --negative-label inactive
+    --label-col phase \
+    --positive-label 4 \
+    --negative-label 0
 ```
 
 `-o output_dir` names the output folder. Everything for the run is written inside that folder:
 
 ```
-my_model/
+output_dir/
 ├── models                 # Saved ML models
 ├── config.json            # settings + the exact feature columns
 ├── hyperparameters.json   # best parameters found
@@ -109,6 +143,9 @@ my_model/
 Because each run has its own folder, training a new model never overwrites a
 previous one.
 
+Molecules whose SMILES cannot be parsed are dropped before training, and step
+2/6 reports how many. Labels stay matched to the molecules that survived.
+
 ### In a Jupyter notebook
 
 ```python
@@ -117,10 +154,10 @@ from train_your_HADES import HADESTrainer
 HADESTrainer(
     output_dir="my_model",
     smiles_col="SMILES",
-    label_col="activity",
-    positive_label="active",
-    negative_label="inactive",
-).run("my_data.csv")
+    label_col="phase",
+    positive_label=4,
+    negative_label=0,
+).run("data_to_test.csv")
 ```
 
 ### Customize the hyperparameter search (optional)
@@ -150,16 +187,16 @@ out_dir = trainer.run("data_to_test.csv")
 
 ## 3. Use a model you trained
 
-After training your own model, you can calculate a custom HADES_score from a Jupyter notebook or the terminal.
+After training your own model, you can calculate a custom HADES_score from a Jupyter notebook or the terminal. Point it at the output folder your run produced — `quick_test_run` below is the one created by the `--param-spaces-file` example above.
 
 ```bash
-python HADES_CALCULATOR.py --models-dir my_model/models --x-train my_model/X_train.parquet -i data_to_test.csv -o scores.csv
+python HADES_CALCULATOR.py --models-dir quick_test_run/models --x-train quick_test_run/X_train.parquet -i data_to_test.csv -o scores.csv
 ```
 
 ```python
 from HADES_CALCULATOR import HADES_score
 
-custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_model/X_train.parquet")
+custom_hades = HADES_score(models_dir="quick_test_run/models", x_train_parquet="quick_test_run/X_train.parquet")
 custom_hades.score(['C1CCCC1', 'c1ccccc1'])
 ```
 
@@ -169,3 +206,8 @@ Suppresses noisy console output from `chemprop`, `admet_ai`, LightGBM, and `tqdm
 progress bars during model loading and inference.
 
 **Usage:** Import it first, before any other heavy library.
+
+Note that importing it applies two process-wide changes that are never undone:
+`warnings` are set to "ignore", and `tqdm` is patched to `disable=True`. This
+also silences the progress bar of the feature-selection step during training,
+which is why `train_your_HADES.py` can run for many minutes with no output.

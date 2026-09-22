@@ -18,10 +18,15 @@ __pycache__/
 # Tip: train with  -o runs/<name>  so every run lands under runs/.
 runs/
 hades_run_*/
+# the -o names used in the README examples
+output_dir/
+quick_test_run/
+# written by CatBoost into the working directory
+catboost_info/
 
 # ---- Data ----
 # Data files are ignored by default. To ship a small test set (e.g. the example
-# molecules), whitelist it with a line like:  !molecules_10.csv
+# molecules), whitelist it with a line like:  !data_to_test.csv
 *.csv
 !data_to_test.csv
 

@@ -1,8 +1,9 @@
-import pandas as pd
 from rdkit import Chem
 from rdkit.Chem import SaltRemover
-import pickle
 from rdkit.Chem.QED import properties as calc_qed_properties
+
+import pickle
+import pandas as pd
 from mordred import Calculator
 from mordred import descriptors
 from admet_ai import ADMETModel
@@ -22,6 +23,52 @@ ADMET_AI_FEATURES = ['logP', 'hydrogen_bond_acceptors', 'hydrogen_bond_donors',
 					 'Clearance_Hepatocyte_AZ', 'Clearance_Microsome_AZ', 'Half_Life_Obach',
 					 'HydrationFreeEnergy_FreeSolv', 'LD50_Zhu', 'Lipophilicity_AstraZeneca', 'PPBR_AZ',
 					 'Solubility_AqSolDB', 'VDss_Lombardo']
+
+
+def unscoreable_reason(smiles):
+	"""
+	Reports whether a SMILES string describes a molecule the HADES models can score.
+
+	RDKit parses more than whole molecules: an empty string yields an atomless mol,
+	and R-group fragments such as 'OC(O)(O)C(O)(S)[*:6]' parse fine because a dummy
+	atom ('*' / '[*:n]' attachment point) is a legal atom. Neither is scoreable --
+	the training set contains no dummy atoms, and roughly a third of the Mordred
+	descriptors come back NaN for such a fragment, so the pipeline's mean-imputation
+	would quietly turn a failed featurization into a confident-looking score.
+
+	Args:
+	    smiles (str): A SMILES representation of the molecule.
+
+	Returns:
+	    str or None: A short phrase explaining why the SMILES cannot be scored,
+	        or None if it can.
+	"""
+	mol = Chem.MolFromSmiles(smiles)
+	if mol is None:
+		return "RDKit cannot parse it"
+	if mol.GetNumAtoms() == 0:
+		return "it contains no atoms"
+	if any(atom.GetAtomicNum() == 0 for atom in mol.GetAtoms()):
+		return "it is a fragment with attachment points (dummy atoms), not a whole molecule"
+	return None
+
+
+def parse_scoreable_mol(smiles):
+	"""
+	Parses a SMILES string, returning None (with a warning) if it cannot be scored.
+
+	Args:
+	    smiles (str): A SMILES representation of the molecule.
+
+	Returns:
+	    rdkit.Chem.rdchem.Mol or None: The parsed molecule, or None when
+	        `unscoreable_reason` rejects it.
+	"""
+	reason = unscoreable_reason(smiles)
+	if reason is not None:
+		print(f"Warning: cannot score SMILES '{smiles}': {reason}")
+		return None
+	return Chem.MolFromSmiles(smiles)
 
 
 def neutralize_atoms(mol): # I have changed it because old def crushed on boron atoms
@@ -164,10 +211,9 @@ class Featurizer:
 		    list: A list of computed features concatenated from Mordred, ADMET AI, and QED calculations.
 		"""
 
-		mol = Chem.MolFromSmiles(smiles)
+		mol = parse_scoreable_mol(smiles)
 		if mol is None:
-			# Return an empty list if SMILES is invalid
-			print(f"Warning: Invalid SMILES string '{smiles}'")
+			# Return an empty list if the SMILES is not a scoreable molecule
 			return []
 		mol = self.standartize_mol(mol)
 		smiles = Chem.MolToSmiles(mol)
@@ -190,23 +236,36 @@ class Featurizer:
 		Computes features for multiple SMILES strings and returns them as a pandas DataFrame.
 
 		Args:
-		    smileses_list (list of str): A list of SMILES strings representing molecules.
+		    smileses_list (list of str or pd.Series): SMILES strings representing molecules.
 		    fillna: If not None, replaces any NaN/missing feature values with this value.
 
 		Returns:
-		    pandas.DataFrame: A DataFrame containing computed features from Mordred, ADMET AI, and QED calculations.
+		    pandas.DataFrame: A DataFrame containing computed features from Mordred, ADMET AI,
+		        and QED calculations. Molecules whose SMILES could not be parsed are absent, so
+		        there is not necessarily one row per input. The index says which inputs survived:
+		        the original labels when `smileses_list` is a Series, otherwise positions in the
+		        input sequence. Align on this index rather than assuming row order matches.
 		"""
 
-		valid_smileses_list, mols_list = [], []
-		for smiles in smileses_list:
-			mol = Chem.MolFromSmiles(smiles)
-			if not mol:
-				print(f"Warning: Invalid SMILES string '{smiles}'")
+		# Carry the caller's index through, so dropped (unparseable) rows stay identifiable.
+		# Without it the result gets a fresh 0..n-1 index, and anything the caller pairs with
+		# it -- labels, SMILES -- silently shifts by the number of rows dropped.
+		index = (smileses_list.index if isinstance(smileses_list, pd.Series)
+				 else pd.RangeIndex(len(smileses_list)))
+
+		valid_index, valid_smileses_list, mols_list = [], [], []
+		for idx, smiles in zip(index, smileses_list):
+			mol = parse_scoreable_mol(smiles)
+			if mol is None:
 				continue
 			mol = self.standartize_mol(mol)
 			mols_list.append(mol)
 			smiles = Chem.MolToSmiles(mol)
 			valid_smileses_list.append(smiles)
+			valid_index.append(idx)
+
+		if not mols_list:  # admet_ai cannot predict on an empty list
+			return pd.DataFrame(columns=self.feature_names)
 
 		mordred_features = pd.DataFrame([dict(r) for r in self.mordred_featurizer.map(mols_list)])
 
@@ -217,6 +276,7 @@ class Featurizer:
 		qed_features = qed_features[self.selected_qed]
 
 		result = pd.concat([mordred_features, admet_features, qed_features], axis=1)
+		result.index = pd.Index(valid_index)
 		if fillna is not None:
 			result = result.fillna(fillna)
 		return result
