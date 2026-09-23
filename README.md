@@ -25,6 +25,7 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ```
 .
 ├── HADES ┐                                     # core package
+          ├──__init__.py                        # package marker; re-exports HADES_score and HADESTrainer
           ├──correlation_drop.py                # drops highly correlated features
           ├──featurize.py                       # featurizes given SMILES with Mordred, ADMET and QED features
           ├──hyperparameter_optimization.py     # finds best hyperparameters using the Optuna algorithm (https://github.com/optuna/optuna)
@@ -36,6 +37,7 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ├── train_your_HADES.py                          # script to train your own HADES model on your own data
 ├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
 ├── environment.yml                             # defines the HADES conda environment
+├── pyproject.toml                              # packaging metadata (`pip install -e .`)
 ├── requirements.txt                            # required libraries, packages, etc.
 ├── data_to_test.csv                            # small sample dataframe for testing the project
 └── README.md                                   # description of the project and its usage
