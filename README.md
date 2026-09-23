@@ -38,6 +38,8 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ├── HADES_CALCULATOR.py                          # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
 ├── train_your_HADES.py                          # script to train your own HADES model on your own data
 ├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
+├── tests/                                      # pytest suite: golden scores and regression checks
+├── .github/workflows/tests.yml                 # runs the suite on pull requests
 ├── environment.yml                             # defines the HADES conda environment
 ├── pyproject.toml                              # packaging metadata (`pip install -e .`)
 ├── requirements.txt                            # required libraries, packages, etc.
@@ -270,6 +272,33 @@ from HADES_CALCULATOR import HADES_score
 custom_hades = HADES_score(models_dir="quick_test_run/models", x_train_parquet="quick_test_run/X_train.parquet")
 custom_hades.score(['C1CCCC1', 'c1ccccc1'])
 ```
+
+## Tests
+
+A small pytest suite guards the two things that have broken silently before: the
+scores themselves, and the alignment between molecules and their results.
+
+```bash
+pytest
+```
+
+It takes about five seconds, and must be run from the repository root so the
+default model and training-data paths resolve. It checks:
+
+- three known molecules against recorded scores (`CCO` → 0.0178465), so a change
+  to the models, the descriptor set or the featurizer cannot pass unnoticed;
+- that featurizing a list containing an unparseable SMILES leaves the surviving
+  rows matched to the molecules they came from;
+- that a list skips what it cannot parse, and that a single unparseable SMILES
+  raises `ValueError`.
+
+The suite loads the ensemble with `verify="require"`, so it also fails if a model
+file no longer matches `SHA256SUMS`.
+
+`.github/workflows/tests.yml` runs the same suite on every pull request and on
+pushes to `main`, after checking the model checksums.
+
+---
 
 ## Quiet Setup (`quiet_noise.py`)
 

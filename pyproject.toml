@@ -38,3 +38,6 @@ py-modules = ["HADES_CALCULATOR", "train_your_HADES"]
 # one environment.yml installs. rdkit is deliberately absent: it comes from
 # conda-forge, so `pip install .` alone does not produce a working install.
 dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

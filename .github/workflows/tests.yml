@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Login shell, so the conda environment is active in every step.
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          # Keyed on environment.yml + requirements.txt; a cold build installs
+          # torch and chemprop and takes several minutes, a cached one ~1 min.
+          cache-environment: true
+
+      - name: Verify model checksums
+        run: cd HADES_saved_models && sha256sum -c SHA256SUMS
+
+      - name: Run tests
+        run: |
+          pip install pytest
+          pytest -q
