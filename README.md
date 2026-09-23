@@ -1,6 +1,6 @@
-# HADES
+# HADES — Holistic AI-based Drug-likeness Estimation Score
 
-HADES is a soft-voting ensemble of five ML models (HistGradientBoosting, RandomForest, CatBoost, XGBoost, and LightGBM) that returns a score for a given SMILES string.
+HADES (Holistic AI-based Drug-likeness Estimation Score) is a soft-voting ensemble of five ML models (HistGradientBoosting, RandomForest, CatBoost, XGBoost, and LightGBM) that predicts the oral drug-likeness of a molecule from its SMILES string.
 
 You can score molecules with the provided pretrained HADES model (https://doi.org/10.1021/acs.jcim.5c02953), or train your own model on your own labelled compounds.
 
@@ -39,6 +39,7 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ├── environment.yml                             # defines the HADES conda environment
 ├── pyproject.toml                              # packaging metadata (`pip install -e .`)
 ├── requirements.txt                            # required libraries, packages, etc.
+├── CITATION.cff                                # how to cite HADES and the paper
 ├── data_to_test.csv                            # small sample dataframe for testing the project
 └── README.md                                   # description of the project and its usage
 ```
