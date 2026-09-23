@@ -1,5 +1,6 @@
 from HADES.quiet_noise import suppress_output
 from HADES.featurize import Featurizer, unscoreable_reason
+from HADES.integrity import verify_model_dir
 
 import argparse, contextlib, glob, os
 from typing import Union
@@ -12,12 +13,14 @@ class HADES_score:
     with an ensemble-averaged probability score.
 
     On init, reads the training feature matrix to recover the descriptor column
-    order and per-column means (used later for NaN imputation), loads every
-    `.pkl` model found in `models_dir` into an ensemble, and builds a
-    `Featurizer` matching the training descriptor columns.
+    order and per-column means (used later for NaN imputation), checks the models
+    in `models_dir` against its `SHA256SUMS` manifest and loads every `.pkl` found
+    there into an ensemble, and builds a `Featurizer` matching the training
+    descriptor columns.
     """
     def __init__(self, models_dir="./HADES_saved_models",
-                 x_train_parquet="./train_test_saved/X_train.parquet", quiet=True, fillna="mean"):
+                 x_train_parquet="./train_test_saved/X_train.parquet", quiet=True, fillna="mean",
+                 verify="auto"):
         """
         Args:
             models_dir (str): Directory containing trained model `.pkl` files.
@@ -32,12 +35,21 @@ class HADES_score:
                 descriptor values after featurization. "mean" fills with the
                 corresponding training-set column mean; any other non-None value is
                 used as a literal fill value; None leaves NaNs as-is. Defaults to "mean".
+            verify (str): How to check the model files before unpickling them.
+                "auto" (default) verifies them against `models_dir/SHA256SUMS` when
+                one is present and warns on stderr when it is not; "require" makes a
+                missing or incomplete manifest an error; "off" skips the check.
+                Model files are pickles -- loading one runs code from it -- so
+                verification only helps when the manifest itself came from a source
+                you trust.
         """
         self.quiet = quiet
         self.fillna = fillna
         x_train = pd.read_parquet(x_train_parquet)
         self.descriptor_cols = list(x_train.columns)[:-1]
         self._train_means = x_train[self.descriptor_cols].mean()
+        # Raises before anything is unpickled if the bytes are not the expected ones.
+        verify_model_dir(models_dir, verify)
         self.models = {os.path.splitext(os.path.basename(p))[0]: joblib.load(p)
                        for p in glob.glob(os.path.join(models_dir, "*.pkl"))}
         with self._q():
@@ -151,9 +163,15 @@ def main():
                    help="Directory containing trained model .pkl files")
     p.add_argument("--x-train", dest="x_train_parquet", default="./train_test_saved/X_train.parquet",
                    help="Path to X_train.parquet used to derive descriptor columns and fill-na means")
+    p.add_argument("--verify", choices=("auto", "require", "off"), default="auto",
+                   help="Check the model files against models-dir/SHA256SUMS before "
+                        "unpickling them: 'auto' verifies when a manifest is present, "
+                        "'require' insists on a complete one, 'off' skips the check "
+                        "(default: auto)")
     args = p.parse_args()
 
-    hades = HADES_score(models_dir=args.models_dir, x_train_parquet=args.x_train_parquet)
+    hades = HADES_score(models_dir=args.models_dir, x_train_parquet=args.x_train_parquet,
+                        verify=args.verify)
 
     if args.input_csv and args.output_csv:
         hades.score_csv(args.input_csv, args.output_csv, smiles_col=args.smiles_col)
