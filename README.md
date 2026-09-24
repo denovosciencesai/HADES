@@ -190,6 +190,41 @@ can train a new HADES ensemble on it.
 **Input:** a CSV with a SMILES column and a label column marking which
 compounds are positive and which are negative.
 
+### How long training takes
+
+Training is slow, and it is slow even on a handful of molecules. Measured on an
+Intel Core 5 120U (10 cores, 12 threads):
+
+| Compounds | Featurizing (2/6) | Feature selection (4/6) | Hyperparameter search (5/6) | Total |
+| --- | --- | --- | --- | --- |
+| 20 | 1s | 14m 18s | 1m 48s | **16m 17s** |
+| 200 | 8s | 15m 58s | 2m 33s | **18m 46s** |
+| 2000 | 1m 33s | 20m 56s | 11m 58s | **34m 37s** |
+
+Two stages dominate, and which one depends on how much data you have.
+
+**Step 4/6, feature selection**, sweeps 99 correlation thresholds, and at each one
+runs 5-fold cross-validation with a 1000-tree random forest — 495 forest fits in
+total. Most of that cost is fixed rather than proportional to your data: it takes
+about 14 minutes on 20 molecules and still only 21 minutes on 2000. Treat roughly
+**15 minutes as a floor you pay regardless of dataset size**.
+
+**Step 5/6, hyperparameter search**, is the stage that actually scales — under 2
+minutes at 20 compounds, 12 minutes at 2000, and still climbing. Above a few
+thousand compounds, expect it to overtake feature selection. Note that
+`--param-spaces-file` shrinks this stage and only this stage; it does not make
+feature selection any faster.
+
+Featurizing (step 2/6) grows linearly with compound count and stays modest.
+
+During step 4/6 the progress bar's estimate is pessimistic on larger datasets,
+because each iteration gets cheaper as descriptors are dropped — the 2000-compound
+run projected 39 minutes at its first iteration and finished in 21. Nothing else
+prints during the sweep. If it looks stalled, it is working.
+
+Scoring is cheap next to training: about 30 ms per molecule (200 compounds in
+5.6s, 2000 in 60.4s), so 10,000 molecules take roughly five minutes.
+
 ### Command line
 
 ```bash
@@ -308,6 +343,10 @@ progress bars during model loading and inference.
 **Usage:** Import it first, before any other heavy library.
 
 Note that importing it applies two process-wide changes that are never undone:
-`warnings` are set to "ignore", and `tqdm` is patched to `disable=True`. This
-also silences the progress bar of the feature-selection step during training,
-which is why `train_your_HADES.py` can run for many minutes with no output.
+`warnings` are set to "ignore", and `tqdm` is patched to `disable=True`.
+
+The feature-selection sweep opts back out with `disable=False`
+(`HADES/correlation_drop.py`), because it is the slowest step in training and
+needs to show progress. It is the one progress bar you will see during a run —
+see [How long training takes](#how-long-training-takes) for what to expect from
+it.
