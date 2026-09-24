@@ -20,6 +20,18 @@ conda activate hades
 That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 `requirements.txt`.
 
+Optionally, install the project into the environment as well:
+
+```bash
+pip install -e .
+```
+
+That makes `from HADES import HADES_score, HADESTrainer` importable from any
+directory, and adds two commands, `hades-score` and `hades-train`, which take the
+same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`. The
+default model and training-data paths are relative to the current directory, so
+run them from the repository root, or pass `--models-dir` and `--x-train`.
+
 ## Repository layout
 
 ```
@@ -39,11 +51,12 @@ That installs Python 3.10, RDKit (via conda-forge), and every pinned package in
 ├── train_your_HADES.py                          # script to train your own HADES model on your own data
 ├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
 ├── tests/                                      # pytest suite: golden scores and regression checks
-├── .github/workflows/tests.yml                 # runs the suite on pull requests
 ├── environment.yml                             # defines the HADES conda environment
 ├── pyproject.toml                              # packaging metadata (`pip install -e .`)
 ├── requirements.txt                            # required libraries, packages, etc.
 ├── CITATION.cff                                # how to cite HADES and the paper
+├── CONTRIBUTING.md                             # how to set up, test and submit changes
+├── SECURITY.md                                 # how to report a vulnerability privately
 ├── data_to_test.csv                            # small sample dataframe for testing the project
 └── README.md                                   # description of the project and its usage
 ```
@@ -146,7 +159,7 @@ RDKit cannot parse every string. What happens depends on how you call `score()`:
 
   ```python
   hades.score("NOT_A_SMILES")
-  # ValueError: Not a valid SMILES: 'NOT_A_SMILES'
+  # ValueError: Cannot score 'NOT_A_SMILES': RDKit cannot parse it
   ```
 
 - **A list** skips the unparseable ones, scores the rest, and reports what it
@@ -177,8 +190,9 @@ python HADES_CALCULATOR.py -i data_to_test.csv -o output.csv --smiles-col SMILES
 The output CSV is your input file plus a `HADES_Score` column. Use
 `--smiles-col` to name the column that holds the SMILES if it is not `SMILES`.
 
-Every input row is kept. Rows whose SMILES could not be parsed get an empty
-`HADES_Score`, and the run prints which ones they were.
+Every input row is kept, in its original order, including repeated SMILES.
+Rows whose SMILES could not be parsed, or whose SMILES cell is empty, get an
+empty `HADES_Score`, and the run prints which ones they were.
 
 ---
 
@@ -211,16 +225,9 @@ about 14 minutes on 20 molecules and still only 21 minutes on 2000. Treat roughl
 
 **Step 5/6, hyperparameter search**, is the stage that actually scales — under 2
 minutes at 20 compounds, 12 minutes at 2000, and still climbing. Above a few
-thousand compounds, expect it to overtake feature selection. Note that
-`--param-spaces-file` shrinks this stage and only this stage; it does not make
-feature selection any faster.
+thousand compounds, expect it to overtake feature selection. 
 
 Featurizing (step 2/6) grows linearly with compound count and stays modest.
-
-During step 4/6 the progress bar's estimate is pessimistic on larger datasets,
-because each iteration gets cheaper as descriptors are dropped — the 2000-compound
-run projected 39 minutes at its first iteration and finished in 21. Nothing else
-prints during the sweep. If it looks stalled, it is working.
 
 Scoring is cheap next to training: about 30 ms per molecule (200 compounds in
 5.6s, 2000 in 60.4s), so 10,000 molecules take roughly five minutes.
@@ -249,7 +256,14 @@ output_dir/
 ```
 
 Because each run has its own folder, training a new model never overwrites a
-previous one.
+previous one: if the folder already exists, training stops with an error. Pass
+`--overwrite` (`overwrite=True` in Python) to train into an existing folder on
+purpose. That replaces the models in it -- any `.pkl` files an earlier run left in
+`models/` are deleted first, so the two runs are never mixed.
+
+To retrain without repeating the hyperparameter search, pass `--reuse-hpo`
+together with `--overwrite`. Step 5/6 then loads `hyperparameters.json` from the
+earlier run in that folder instead of searching again.
 
 Molecules whose SMILES cannot be parsed are dropped before training, and step
 2/6 reports how many. Labels stay matched to the molecules that survived.
@@ -317,7 +331,7 @@ scores themselves, and the alignment between molecules and their results.
 pytest
 ```
 
-It takes about five seconds, and must be run from the repository root so the
+It takes about fifteen seconds, and must be run from the repository root so the
 default model and training-data paths resolve. It checks:
 
 - three known molecules against recorded scores (`CCO` → 0.0178465), so a change
@@ -325,13 +339,20 @@ default model and training-data paths resolve. It checks:
 - that featurizing a list containing an unparseable SMILES leaves the surviving
   rows matched to the molecules they came from;
 - that a list skips what it cannot parse, and that a single unparseable SMILES
-  raises `ValueError`.
+  raises `ValueError`;
+- that the `SMILES` column of the training parquet is found by name, and that
+  descriptors which do not match the models' features raise instead of scoring;
+- that output printed before scoring reaches a pipe exactly once.
+
+One more test trains a model end to end on `data_to_test.csv` and scores with it.
+It takes about 16 minutes, so it is skipped by default:
+
+```bash
+pytest -m slow
+```
 
 The suite loads the ensemble with `verify="require"`, so it also fails if a model
 file no longer matches `SHA256SUMS`.
-
-`.github/workflows/tests.yml` runs the same suite on every pull request and on
-pushes to `main`, after checking the model checksums.
 
 ---
 

@@ -27,8 +27,10 @@ class HADES_score:
                 Every file found here is loaded and included in the scoring ensemble,
                 keyed by filename (without extension).
             x_train_parquet (str): Path to the training feature parquet. Its columns
-                (excluding the last, assumed to be the target) define the expected
-                descriptor order, and their means are used for mean-imputation.
+                (excluding the "SMILES" column, which it must contain) define the
+                expected descriptor order, and their means are used for
+                mean-imputation. Raises ValueError if that order does not match the
+                features any model was trained on.
             quiet (bool): If True, suppresses stdout/stderr noise from the featurizer
                 during construction and scoring. Defaults to True.
             fillna (str or scalar or None): Strategy for filling missing/invalid
@@ -46,12 +48,29 @@ class HADES_score:
         self.quiet = quiet
         self.fillna = fillna
         x_train = pd.read_parquet(x_train_parquet)
-        self.descriptor_cols = list(x_train.columns)[:-1]
+        # Drop SMILES by name: dropping by position would silently discard a real
+        # descriptor from any file whose columns are ordered differently.
+        if "SMILES" not in x_train.columns:
+            raise ValueError(f"{x_train_parquet} has no 'SMILES' column; cannot tell "
+                             f"which of its columns are descriptors")
+        self.descriptor_cols = list(x_train.columns.drop("SMILES"))
         self._train_means = x_train[self.descriptor_cols].mean()
+        model_paths = glob.glob(os.path.join(models_dir, "*.pkl"))
+        if not model_paths:
+            # Without this an empty or mistyped directory loads no models and every
+            # score comes back NaN.
+            raise FileNotFoundError(f"No .pkl model files in {models_dir!r}")
         # Raises before anything is unpickled if the bytes are not the expected ones.
         verify_model_dir(models_dir, verify)
         self.models = {os.path.splitext(os.path.basename(p))[0]: joblib.load(p)
-                       for p in glob.glob(os.path.join(models_dir, "*.pkl"))}
+                       for p in model_paths}
+        # The models, not the parquet, define the features. CatBoost does not record
+        # names, so without this check it would score a misaligned vector silently.
+        for name, model in self.models.items():
+            expected = getattr(model, "feature_names_in_", None)
+            if expected is not None and list(expected) != self.descriptor_cols:
+                raise ValueError(f"Descriptor columns in {x_train_parquet} do not match "
+                                 f"the features model {name!r} was trained on")
         with self._q():
             self.featurizer = Featurizer.from_columns(self.descriptor_cols)
         self._feature_names = self.featurizer.feature_names
@@ -89,6 +108,19 @@ class HADES_score:
             df = df.fillna(self.fillna)
         return df
 
+    def _score_positions(self, smiles_list):
+        """
+        Scores a list of SMILES.
+        Returns:
+            tuple[list[int], np.ndarray]: The positions in `smiles_list` that could be
+                scored, and their scores in the same order.
+        """
+        with self._q():
+            X = self._featurize(smiles_list)
+            scores = (np.mean([m.predict_proba(X)[:, 1] for m in self.models.values()], axis=0)
+                      if len(X) else np.array([]))
+        return list(X.index), scores
+
     def score(self, smiles: Union[str, list[str]]):
         """
         Scores one or more molecules by averaging the positive-class probability
@@ -108,12 +140,9 @@ class HADES_score:
         """
         single = isinstance(smiles, str)
         smiles_list = [smiles] if single else list(smiles)
-        with self._q():
-            X = self._featurize(smiles_list)
-            scores = (np.mean([m.predict_proba(X)[:, 1] for m in self.models.values()], axis=0)
-                      if len(X) else np.array([]))
-        kept = list(X.index)
-        bad = [s for i, s in enumerate(smiles_list) if i not in set(kept)]
+        kept, scores = self._score_positions(smiles_list)
+        kept_set = set(kept)
+        bad = [s for i, s in enumerate(smiles_list) if i not in kept_set]
         if single:
             if bad:
                 # The featurizer's warning is swallowed when quiet=True, so restate the reason here.
@@ -133,10 +162,20 @@ class HADES_score:
             smiles_col (str): Name of the column containing SMILES strings.
                 Defaults to "SMILES".
         Returns:
-            pd.DataFrame: The merged input + score DataFrame that was written to disk.
+            pd.DataFrame: The input rows, in their original order, plus a
+                "HADES_Score" column (empty for SMILES that could not be scored),
+                as written to disk.
         """
-        df_in = pd.read_csv(input_csv)
-        df_out = df_in.merge(self.score(df_in[smiles_col].tolist()), left_on=smiles_col, right_on="SMILES", how="left")
+        df_out = pd.read_csv(input_csv)
+        smiles_list = df_out[smiles_col].tolist()
+        kept, scores = self._score_positions(smiles_list)
+        # Place scores by row position. Merging on the SMILES text multiplied rows
+        # whenever a SMILES appeared more than once.
+        df_out["HADES_Score"] = pd.Series(scores, index=df_out.index[kept], dtype=float)
+        kept_set = set(kept)
+        bad = [s for i, s in enumerate(smiles_list) if i not in kept_set]
+        if bad:
+            print(f"Could not calculate {len(bad)} SMILES: {bad}")
         df_out.to_csv(output_csv, index=False)
         print(f"Wrote {len(df_out)} scored rows to {output_csv}")
         return df_out

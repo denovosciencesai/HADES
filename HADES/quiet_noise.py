@@ -1,4 +1,4 @@
-import os, warnings, logging, contextlib
+import os, sys, warnings, logging, contextlib
 from functools import partialmethod
 
 _silenced = False
@@ -32,7 +32,14 @@ def suppress_output():
     """
     Context manager that redirects stdout and stderr to devnull for the
     duration of the block, then restores them.
+
+    Flushes the real streams first. `multiprocessing` flushes `sys.stdout` and
+    `sys.stderr` before it forks, but inside this block those are devnull, so
+    anything still buffered in the real stdout (block-buffered when piped) is
+    copied into every forked worker and written out again when it exits.
     """
+    sys.stdout.flush()
+    sys.stderr.flush()
     with open(os.devnull, "w") as devnull:
         with contextlib.redirect_stdout(devnull), contextlib.redirect_stderr(devnull):
             yield

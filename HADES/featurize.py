@@ -43,6 +43,9 @@ def unscoreable_reason(smiles):
 	    str or None: A short phrase explaining why the SMILES cannot be scored,
 	        or None if it can.
 	"""
+	if not isinstance(smiles, str):
+		# A blank cell in a CSV arrives as NaN; RDKit would raise a TypeError on it.
+		return "it is not a string (an empty cell?)"
 	mol = Chem.MolFromSmiles(smiles)
 	if mol is None:
 		return "RDKit cannot parse it"

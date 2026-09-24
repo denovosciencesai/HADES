@@ -41,3 +41,6 @@ dependencies = {file = ["requirements.txt"]}
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# Training takes ~16 minutes; run those tests explicitly with `pytest -m slow`.
+addopts = "-m 'not slow'"
+markers = ["slow: trains a model end to end (~16 minutes)"]

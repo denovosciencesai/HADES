@@ -95,17 +95,34 @@ class HADESTrainer:
 
     def _make_dirs(self):
         """
-        Creates the output directory (and its `models` subdirectory).
+        Creates the output directory (and its `models` subdirectory), removing any
+        model files an earlier run left in `models`.
         Raises:
             FileExistsError: If `self.output_dir` already exists and
                 `self.overwrite` is False.
         Returns:
             str: The output directory path.
         """
-        if os.path.exists(self.output_dir) and not self.overwrite:
-            raise FileExistsError(f"'{self.output_dir}' exists; pass overwrite=True.")
-        os.makedirs(os.path.join(self.output_dir, "models"), exist_ok=True)
+        self._check_output_dir()
+        models_dir = os.path.join(self.output_dir, "models")
+        os.makedirs(models_dir, exist_ok=True)
+        # HADES_score loads every .pkl in models/, so models left from an earlier run
+        # in this folder would be averaged in with the new ones. Their SHA256SUMS
+        # would no longer describe the directory either.
+        for name in os.listdir(models_dir):
+            if name.endswith(".pkl") or name == "SHA256SUMS":
+                os.remove(os.path.join(models_dir, name))
         return self.output_dir
+
+    def _check_output_dir(self):
+        """
+        Raises:
+            FileExistsError: If `self.output_dir` already exists and
+                `self.overwrite` is False.
+        """
+        if os.path.exists(self.output_dir) and not self.overwrite:
+            raise FileExistsError(f"'{self.output_dir}' exists; pass overwrite=True "
+                                  f"(--overwrite on the command line).")
 
     def _load_data(self, csv_path):
         """
@@ -215,9 +232,12 @@ class HADESTrainer:
         Returns:
             str: The output directory containing all run artifacts.
         """
-        out = self._make_dirs()
+        # Validate before creating anything, so a bad CSV or column name does not
+        # leave behind a folder that blocks the retry.
+        self._check_output_dir()
         t0 = _step("1/6 Loading data")
         df = self._load_data(csv_path)
+        out = self._make_dirs()
         n_pos = int(df["_target"].sum())
         _done(t0, f"{len(df)} molecules ({n_pos} positive, {len(df) - n_pos} negative)")
 
