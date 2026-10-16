@@ -150,22 +150,39 @@ class HADESTrainer:
 
     def _featurize(self, df):
         """
-        Computes molecular descriptors for every SMILES in `df` and drops
-        uninformative columns.
-        Featurizes `df[self.smiles_col]` in bulk, then drops columns that are
-        all-NaN or constant across rows.
+        Computes molecular descriptors for every SMILES in `df`.
+        Featurizes `df[self.smiles_col]` in bulk. No columns are dropped here:
+        which descriptors survive is decided after the train/test split, from
+        the training rows alone (see `_surviving_cols`).
         Args:
             df (pd.DataFrame): DataFrame containing the SMILES column to
                 featurize.
         Returns:
-            pd.DataFrame: Feature matrix with string-typed column names, indexed
-                to match the rows that were successfully featurized.
+            pd.DataFrame: Raw feature matrix with string-typed column names,
+                indexed to match the rows that were successfully featurized.
         """
         with suppress_output():
             feats = self.featurizer.featurize_many_smiles(df[self.smiles_col])
-        feats = self.featurizer.drop_same_val_cols(self.featurizer.drop_na_cols(feats))
         feats.columns = feats.columns.astype(str)
         return feats
+
+    def _surviving_cols(self, X_train):
+        """
+        Returns the descriptors that survive the uninformative-column filters,
+        computed from the training rows only.
+        Both filters are row-dependent -- `drop_na_cols` keys on column dtype, so
+        a single Mordred error object makes a whole column object-typed, and
+        `drop_same_val_cols` keys on how often the modal value repeats. Running
+        them over the full dataset would let the held-out rows help decide the
+        feature set, so they are fitted on the training split alone.
+        Args:
+            X_train (pd.DataFrame): Training feature matrix, as returned by
+                `_featurize`.
+        Returns:
+            list[str]: The column names to keep.
+        """
+        kept = self.featurizer.drop_same_val_cols(self.featurizer.drop_na_cols(X_train))
+        return list(kept.columns)
 
     @staticmethod
     def _select_features(X, y, random_state):
@@ -244,7 +261,7 @@ class HADESTrainer:
         t0 = _step("2/6 Featurizing (Mordred + ADMET-AI + QED)")
         feats = self._featurize(df)
         dropped = len(df) - len(feats)
-        note = f"{len(feats)} molecules, {feats.shape[1]} descriptors"
+        note = f"{len(feats)} molecules, {feats.shape[1]} raw descriptors"
         _done(t0, note + (f" -- {dropped} SMILES could not be parsed" if dropped else ""))
         y, smiles = df["_target"].loc[feats.index], df[self.smiles_col].loc[feats.index]
 
@@ -252,9 +269,18 @@ class HADESTrainer:
             feats, y, smiles, test_size=self.test_size, random_state=self.random_state, stratify=y)
         print(f"  3/6 Split ......... {len(X_train)} train / {len(X_test)} test", flush=True)
 
+        # Fitted on X_train
+        surviving = self._surviving_cols(X_train)
+        X_train, X_test = X_train[surviving], X_test[surviving]
+
         t0 = _step(f"4/6 Selecting features from {X_train.shape[1]} descriptors (slowest step)")
         keep_cols, opt_threshold = self._select_features(X_train, y_train, self.random_state)
-        X_train, X_test = X_train[keep_cols].astype(float), X_test[keep_cols].astype(float)
+        X_train = X_train[keep_cols].astype(float)
+        # A descriptor can be numeric across every training row and still hold a
+        # Mordred error object on a test molecule, which astype(float) raises on.
+        # Coerce those to NaN and fill from the training means -- the same
+        # transform HADES_CALCULATOR applies to new molecules when scoring.
+        X_test = X_test[keep_cols].apply(pd.to_numeric, errors="coerce").fillna(X_train.mean())
         _done(t0, f"kept {len(keep_cols)} descriptors (correlation threshold {opt_threshold:.2f})")
 
         hpo_path = os.path.join(out, "hyperparameters.json")
