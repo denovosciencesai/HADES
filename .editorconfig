@@ -1,0 +1,22 @@
+# Editors read this automatically, so contributors get the repository's
+# indentation without having to know about it. HADES/featurize.py,
+# correlation_drop.py and hyperparameter_optimization.py were tab-indented
+# until the whole package was normalised to spaces.
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[*.{yml,yaml,json,cff,toml}]
+indent_style = space
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false

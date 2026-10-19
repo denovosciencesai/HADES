@@ -1,0 +1,89 @@
+cff-version: 1.2.0
+title: "HADES — Holistic AI-based Drug-likeness Estimation Score"
+abstract: >-
+  A soft-voting ensemble of five machine learning models that integrates ADMET
+  and physicochemical properties to predict the oral drug-likeness of a
+  molecule from its SMILES string.
+message: "If you use HADES, please cite the article under preferred-citation."
+type: software
+version: 1.0.0
+license: MIT
+repository-code: "https://github.com/denovosciencesai/HADES-Internal"
+keywords:
+  - drug-likeness
+  - ADMET
+  - cheminformatics
+  - machine learning
+  - virtual screening
+  - SMILES
+authors:
+  - given-names: Narek
+    family-names: Petrosyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Hovhannes
+    family-names: Matevosyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Irina
+    family-names: Tirosyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Yeva
+    family-names: Gabrielyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Smbat
+    family-names: Gevorgyan
+    affiliation: "Denovo Sciences Inc."
+    orcid: "https://orcid.org/0000-0001-9720-3389"
+  - given-names: Vardan
+    family-names: Harutyunyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Mher
+    family-names: Matevosyan
+    affiliation: "Denovo Sciences Inc."
+  - given-names: Hovakim
+    family-names: Zakaryan
+    affiliation: "Denovo Sciences Inc."
+    orcid: "https://orcid.org/0000-0002-5081-1018"
+contact:
+  - given-names: Hovakim
+    family-names: Zakaryan
+    affiliation: "Denovo Sciences Inc."
+    orcid: "https://orcid.org/0000-0002-5081-1018"
+preferred-citation:
+  type: article
+  title: "Machine Learning-Based Soft Voting Ensemble Model for the Prediction of Oral Drug-Likeness of Chemical Structures"
+  journal: "Journal of Chemical Information and Modeling"
+  doi: 10.1021/acs.jcim.5c02953
+  volume: 66
+  issue: 16
+  start: 9944
+  end: 9960
+  year: 2026
+  month: 5
+  authors:
+    - given-names: Narek
+      family-names: Petrosyan
+      affiliation: "Denovo Sciences Inc."
+      orcid: "https://orcid.org/0009-0004-4714-8835"
+    - given-names: Hovhannes
+      family-names: Matevosyan
+      affiliation: "Denovo Sciences Inc."
+    - given-names: Irina
+      family-names: Tirosyan
+      affiliation: "Denovo Sciences Inc."
+    - given-names: Yeva
+      family-names: Gabrielyan
+      affiliation: "Denovo Sciences Inc."
+    - given-names: Smbat
+      family-names: Gevorgyan
+      affiliation: "Denovo Sciences Inc."
+      orcid: "https://orcid.org/0000-0001-9720-3389"
+    - given-names: Vardan
+      family-names: Harutyunyan
+      affiliation: "Denovo Sciences Inc."
+    - given-names: Mher
+      family-names: Matevosyan
+      affiliation: "Denovo Sciences Inc."
+    - given-names: Hovakim
+      family-names: Zakaryan
+      affiliation: "Denovo Sciences Inc."
+      orcid: "https://orcid.org/0000-0002-5081-1018"

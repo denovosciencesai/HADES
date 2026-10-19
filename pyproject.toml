@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hades"
+version = "1.0.0"
+description = "Soft-voting ensemble that scores small molecules from their SMILES"
+readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
+# The pickled models and the pinned stack were built on Python 3.10 (see
+# environment.yml); nothing here has been validated on 3.11+.
+requires-python = ">=3.10,<3.11"
+dynamic = ["dependencies"]
+classifiers = [
+    "Programming Language :: Python :: 3.10",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Chemistry",
+]
+
+[project.urls]
+Paper = "https://doi.org/10.1021/acs.jcim.5c02953"
+
+[project.scripts]
+hades-score = "HADES_CALCULATOR:main"
+hades-train = "train_your_HADES:main"
+
+[tool.setuptools]
+# Flat layout: the package sits at the repo root under its own name, and the
+# two entry-point scripts stay beside it as top-level modules so the published
+# `from HADES_CALCULATOR import HADES_score` keeps working once installed.
+packages = ["HADES"]
+py-modules = ["HADES_CALCULATOR", "train_your_HADES"]
+
+[tool.setuptools.dynamic]
+# Single source of truth for pins -- a second list here would drift from the
+# one environment.yml installs. rdkit is deliberately absent: it comes from
+# conda-forge, so `pip install .` alone does not produce a working install.
+dependencies = {file = ["requirements.txt"]}
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Training takes ~16 minutes; run those tests explicitly with `pytest -m slow`.
+addopts = "-m 'not slow'"
+markers = ["slow: trains a model end to end (~16 minutes)"]

@@ -5,6 +5,10 @@ env/
 .conda/
 *.egg-info/
 
+# ---- Build artifacts (`pip install .`, `python -m build`) ----
+build/
+dist/
+
 # ---- Python ----
 __pycache__/
 *.py[cod]
