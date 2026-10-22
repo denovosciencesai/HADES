@@ -10,7 +10,7 @@ Report privately through GitHub:
 **Security → Report a vulnerability** on this repository
 (<https://github.com/denovosciencesai/HADES-Internal/security/advisories/new>).
 
-If you cannot use GitHub, email **<SECURITY-CONTACT-EMAIL>**.
+If you cannot use GitHub, email **<narekp@denovosciences.ai>**.
 
 Please include what you found, the steps or files that reproduce it, and the
 HADES version or commit you tested. We aim to acknowledge a report within
