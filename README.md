@@ -29,8 +29,9 @@ pip install -e .
 That makes `from HADES import HADES_score, HADESTrainer` importable from any
 directory, and adds two commands, `hades-score` and `hades-train`, which take the
 same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`. The
-default model and training-data paths are relative to the current directory, so
-run them from the repository root, or pass `--models-dir` and `--x-train`.
+trained models and the descriptor spec are installed alongside the code, so both
+work from any directory -- pass `--models-dir` only to score with an ensemble of
+your own.
 
 ## Repository layout
 
@@ -43,10 +44,12 @@ run them from the repository root, or pass `--models-dir` and `--x-train`.
           ├──hyperparameter_optimization.py     # finds best hyperparameters using the Optuna algorithm (https://github.com/optuna/optuna)
           ├──integrity.py                       # writes and checks the SHA-256 manifest of a model directory
           ├──param_spaces.py                    # hyperparameter search space for Optuna
-          └──quiet_noise.py                     # silences warnings, tqdm bars, etc. for a cleaner console; can be disabled for debugging
-├── HADES_saved_models/                         # the trained ML models (.pkl files) for HADES_score
-          └──SHA256SUMS                         # SHA-256 digest of each model file, checked before loading
-├── train_test_saved/                           # split data used in the original paper
+          ├──quiet_noise.py                     # silences warnings, tqdm bars, etc. for a cleaner console; can be disabled for debugging
+          └──data/                              # shipped with the package, so an installed HADES finds it anywhere
+                ├──models/                      # the trained ML models (.pkl files) for HADES_score
+                │     └──SHA256SUMS             # SHA-256 digest of each model file, checked before loading
+                └──feature_spec.parquet         # descriptor order and means, derived from train_test_saved/X_train.parquet
+├── train_test_saved/                           # split data used in the original paper (not shipped with the package)
 ├── HADES_CALCULATOR.py                          # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
 ├── train_your_HADES.py                          # script to train your own HADES model on your own data
 ├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
@@ -65,7 +68,7 @@ run them from the repository root, or pass `--models-dir` and `--x-train`.
 
 ## Model artifacts and integrity
 
-The five pretrained models ship as Python pickles (`HADES_saved_models/*.pkl`).
+The five pretrained models ship as Python pickles (`HADES/data/models/*.pkl`).
 **Unpickling a file executes code contained in it.** Only load model files from a
 source you trust — this repository, or a training run you produced yourself. That
 applies in particular to section 3 below, where you point `--models-dir` at a
@@ -74,7 +77,7 @@ whatever is in it.
 
 ### Published checksums
 
-`HADES_saved_models/SHA256SUMS` records the SHA-256 digest of every shipped model:
+`HADES/data/models/SHA256SUMS` records the SHA-256 digest of every shipped model:
 
 ```
 e990b6cdd5c83fbc6c186b23df325c6a10d0b6969261f5dc9a7376f493a6e3ec  CatBoostClassifier.pkl
@@ -87,7 +90,7 @@ c96a8d48d24e2ac6e58531ff6d8dc38d85058acc798ce90dceddb24bd0866dbf  LGBMClassifier
 It is a standard `sha256sum` file, so it can be checked without Python:
 
 ```bash
-cd HADES_saved_models && sha256sum -c SHA256SUMS
+cd HADES/data/models && sha256sum -c SHA256SUMS
 ```
 
 ### Checking on load
@@ -331,8 +334,9 @@ scores themselves, and the alignment between molecules and their results.
 pytest
 ```
 
-It takes about fifteen seconds, and must be run from the repository root so the
-default model and training-data paths resolve. It checks:
+It takes about fifteen seconds, and must be run from a checkout: the suite reads
+the paper's train/test split, which the installed package does not carry. It
+checks:
 
 - three known molecules against recorded scores (`CCO` → 0.0178465), so a change
   to the models, the descriptor set or the featurizer cannot pass unnoticed;

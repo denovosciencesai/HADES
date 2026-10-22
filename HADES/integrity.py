@@ -9,7 +9,7 @@ mismatch is a reason to stop, not a reason to fetch the file again.
 The manifest is written in the standard `sha256sum` format, so a model
 directory can also be checked without Python:
 
-    cd HADES_saved_models && sha256sum -c SHA256SUMS
+    cd HADES/data/models && sha256sum -c SHA256SUMS
 """
 
 import glob

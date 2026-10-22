@@ -295,7 +295,7 @@ class HADESTrainer:
                 json.dump(results, f, indent=4)
             _done(t0, f"{len(results)} models tuned")
 
-        t0 = _step(f"6/6 Fitting final ensemble")
+        t0 = _step("6/6 Fitting final ensemble")
         models = self._train_ensemble(X_train, y_train, results)
         for name, model in models.items():
             joblib.dump(model, os.path.join(out, "models", f"{name}.pkl"))
