@@ -1,3 +1,5 @@
+![HADES](hades-logo.svg)
+
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
 HADES (Holistic AI-based Drug-likeness Estimation Score) is a soft-voting ensemble of five ML models (HistGradientBoosting, RandomForest, CatBoost, XGBoost, and LightGBM) that predicts the oral drug-likeness of a molecule from its SMILES string.
