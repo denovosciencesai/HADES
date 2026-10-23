@@ -1,4 +1,4 @@
-![HADES](hades-logo.svg)
+![HADES](hades_logo.svg)
 
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
@@ -52,11 +52,12 @@ your own.
                 │     └──SHA256SUMS             # SHA-256 digest of each model file, checked before loading
                 └──feature_spec.parquet         # descriptor order and means, derived from train_test_saved/X_train.parquet
 ├── train_test_saved/                           # split data used in the original paper (not shipped with the package)
-├── HADES_CALCULATOR.py                          # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
-├── train_your_HADES.py                          # script to train your own HADES model on your own data
-├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
+├── HADES_CALCULATOR.py                         # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
+├── train_your_HADES.py                         # script to train your own HADES model on your own data
+├── parameters_test.py                          # a small hyperparameter set for testing custom parameter spaces during HADES training
 ├── tests/                                      # pytest suite: golden scores and regression checks
 ├── environment.yml                             # defines the HADES conda environment
+├── hades_logo.svg                              # Logo for Repository
 ├── pyproject.toml                              # packaging metadata (`pip install -e .`)
 ├── requirements.txt                            # required libraries, packages, etc.
 ├── CITATION.cff                                # how to cite HADES and the paper
