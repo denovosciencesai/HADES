@@ -1,7 +1,6 @@
 """Checks for the MCP server, `hades_mcp.py`.
 
-Skipped unless the MCP SDK 2.x is installed (`pip install -e ".[mcp]"`). Like
-the rest of the suite, run from the repository root.
+Skipped unless the MCP SDK 2.x is installed (`pip install -e ".[mcp]"`).
 
 Two things matter here: every score must come back attached to the molecule it
 belongs to, and nothing HADES or its dependencies print may reach stdout, which
@@ -92,7 +91,8 @@ def test_a_single_molecule_is_scored():
 
 
 def test_salts_are_stripped_and_salt_only_inputs_rejected():
-    """A salt form scores as its parent; an input that is nothing but salt is rejected.
+    """A salt whose counter-ion HADES strips scores as its parent; an input that
+    stripping leaves empty is rejected.
 
     Stripped to an empty molecule, a salt-only input would otherwise come back
     with the same imputed score as every other one.
@@ -102,6 +102,15 @@ def test_salts_are_stripped_and_salt_only_inputs_rejected():
     assert out["results"][0]["hades_score"] == pytest.approx(GOLDEN["CCO"], abs=TOLERANCE)
     assert [r["index"] for r in out["invalid"]] == [1, 2]
     assert all("salts" in r["reason"] for r in out["invalid"])
+
+
+def test_a_failed_standardization_is_reported_not_raised():
+    """Neutralizing this anion breaks RDKit's valence rules. HADES would fail the
+    whole batch on it, so the server reports it and scores the rest."""
+    out = score(["CCO", "C[P-](C)(C)(C)(C)C"])
+    assert out["results"][0]["hades_score"] == pytest.approx(GOLDEN["CCO"], abs=TOLERANCE)
+    assert [r["index"] for r in out["invalid"]] == [1]
+    assert "standardize" in out["invalid"][0]["reason"]
 
 
 def test_nothing_scoreable_is_reported_not_raised():

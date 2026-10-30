@@ -30,7 +30,7 @@ Run `pytest -m slow` too if your change touches training (`train_your_HADES.py`,
 
 `tests/test_mcp.py` runs only when the MCP SDK is installed
 (`pip install -e ".[mcp]"`); install it if your change touches `hades_mcp.py` or
-the plugin. It starts the server in subprocesses, so it adds about a minute.
+the plugin. It starts the server in subprocesses, so it adds about two minutes.
 
 ## If a change moves the scores
 

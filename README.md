@@ -53,8 +53,8 @@ hades.score(["CCO", "c1ccccc1"])  # DataFrame with SMILES and HADES_Score column
 
 ### How it works
 
-Each SMILES is standardized (salts stripped, charges neutralized, stereochemistry
-removed) and described by 298 molecular descriptors: Mordred descriptors, ADMET
+Each SMILES is standardized (common counter-ions stripped, charges neutralized,
+stereochemistry removed) and described by 298 molecular descriptors: Mordred descriptors, ADMET
 properties predicted by ADMET-AI, and six of the eight properties behind QED.
 Each of the five classifiers predicts the probability that the molecule belongs
 with the approved oral drugs, and the HADES score is the mean of the five.
@@ -90,10 +90,10 @@ directory, and adds two commands, `hades-score` and `hades-train`, which take th
 same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`. The
 default model and training-data paths are relative to the current directory, so
 run them from the repository root, or pass `--models-dir` and `--x-train`.
-`pip install -e ".[mcp]"` adds a third command, `hades-mcp`, the MCP server of
-[section 4](#4-use-hades-from-claude-and-other-mcp-clients); it finds the
-repository's models from any directory and is configured through environment
-variables instead.
+The same install adds a third command, `hades-mcp`, the MCP server of
+[section 4](#4-use-hades-from-claude-and-other-mcp-clients). It also needs the MCP
+SDK, which `pip install -e ".[mcp]"` adds; it finds the repository's models from
+any directory and is configured through environment variables instead.
 
 ## Repository layout
 
@@ -525,7 +525,8 @@ depends on the client:
   servers they start. Add an `env` block to the server entry:
   `"env": {"HADES_MODELS_DIR": "/abs/path/run/models", "HADES_X_TRAIN": "/abs/path/run/X_train.parquet"}`.
 - **Through `wsl.exe`**, Windows variables reach WSL only when listed in
-  `WSLENV`, for example `WSLENV=HADES_MODELS_DIR/p:HADES_X_TRAIN/p`.
+  `WSLENV`, so set them on the Linux side instead, with `env` before the command:
+  `"args": ["-d", "Ubuntu", "-e", "env", "HADES_MODELS_DIR=/home/you/run/models", "/home/you/miniconda3/envs/hades/bin/python", "/home/you/HADES/hades_mcp.py"]`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
@@ -566,7 +567,7 @@ default model and training-data paths resolve. It checks:
   input, that real client sessions work over stdio, and that output printed
   during a call reaches stderr instead of the JSON-RPC stream (`tests/test_mcp.py`,
   skipped without the SDK; it starts the server in subprocesses, so it adds about
-  a minute).
+  two minutes).
 
 One more test trains a model end to end on `data_to_test.csv` and scores with it.
 It takes about 16 minutes, so it is skipped by default:
@@ -640,11 +641,15 @@ predictions, in models fitted to separate approved oral drugs from non-drug
 molecules. See the paper for how it compares with other drug-likeness scores.
 
 **Which molecules can it score?**
-Whole molecules that RDKit can parse. Salts and counter-ions are stripped and
-charges neutralized first, so a salt form scores as its parent molecule. Empty
-inputs and fragments with attachment points (`*`) are rejected rather than scored;
-the MCP server also rejects inputs that are nothing but salts, such as sodium
-chloride. Scores mean most for drug-sized organic molecules like the ones in the
+Whole molecules that RDKit can parse. The counter-ions on RDKit's default salt
+list (Na+, K+, Cl-, mesylate, tartrate and other common ones) are stripped and
+charges neutralized first, so those salt forms score as their parent molecule.
+Others, such as citrate, besylate or succinate, stay attached, as does the second
+copy of the parent in a 2:1 salt, and they change the score: to score a drug,
+pass its parent compound (free acid or base). Empty inputs and fragments with
+attachment points (`*`) are rejected rather than scored; the MCP server also
+rejects inputs that salt stripping leaves empty, such as sodium chloride or
+water. Scores mean most for drug-sized organic molecules like the ones in the
 training data; a low score for chemistry far outside it is not evidence that a
 molecule is not drug-like.
 

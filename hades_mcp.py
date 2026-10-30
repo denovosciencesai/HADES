@@ -48,6 +48,7 @@ pip install -e ".[mcp]"
 from __future__ import annotations
 
 import argparse
+import inspect
 import logging
 import os
 import sys
@@ -68,9 +69,10 @@ except ImportError as exc:
 
 log = logging.getLogger("hades-mcp")
 
+# For every HADES_* variable, an empty value means unset.
 REPO_ROOT = Path(os.environ.get("HADES_REPO") or Path(__file__).resolve().parent)
-VERIFY = os.environ.get("HADES_VERIFY", "auto")
-MAX_BATCH = int(os.environ.get("HADES_MAX_BATCH") or 100)  # empty means unset, like the others
+VERIFY = os.environ.get("HADES_VERIFY") or "auto"
+MAX_BATCH = int(os.environ.get("HADES_MAX_BATCH") or 100)
 
 mcp = MCPServer(
     name="hades",
@@ -110,24 +112,23 @@ def _importable():
         sys.path.insert(0, str(REPO_ROOT))
 
 
-def _model_paths() -> dict[str, str]:
-    """The model and descriptor paths to pass to HADES_score.
+def _model_paths(scorer: type) -> dict[str, str]:
+    """The model and descriptor paths to pass to `scorer`, the HADES_score class.
 
-    The server runs in the client's working directory -- the user's project, not
-    this repository -- and HADES_score's default paths are relative to the
-    working directory. So pass the repository's own models and the training
-    parquet that goes with them, as absolute paths, then let HADES_MODELS_DIR
-    and HADES_X_TRAIN override either one.
-
-    A checkout whose HADES_saved_models/ holds no models -- the package ships
-    them itself, or only a stray file is left there -- gets HADES_score's
-    defaults instead, which then resolve inside the package.
+    The server runs in the client's working directory -- the user's project,
+    not this repository. Where HADES_score's default paths are relative (models
+    kept in the repository), resolve them against REPO_ROOT instead of that
+    directory; where they are absolute or unset (models installed with the
+    package), keep them. Either way the server loads the models `hades-score`
+    loads from the repository root. HADES_MODELS_DIR and HADES_X_TRAIN override
+    either path.
     """
+    defaults = inspect.signature(scorer).parameters
     paths = {}
-    saved_models = REPO_ROOT / "HADES_saved_models"
-    if any(saved_models.glob("*.pkl")):
-        paths["models_dir"] = str(saved_models)
-        paths["x_train_parquet"] = str(REPO_ROOT / "train_test_saved" / "X_train.parquet")
+    for name in ("models_dir", "x_train_parquet"):
+        default = defaults[name].default
+        if isinstance(default, str) and not os.path.isabs(default):
+            paths[name] = str(REPO_ROOT / default)
     if os.environ.get("HADES_MODELS_DIR"):
         paths["models_dir"] = os.environ["HADES_MODELS_DIR"]
     if os.environ.get("HADES_X_TRAIN"):
@@ -137,11 +138,12 @@ def _model_paths() -> dict[str, str]:
 
 def _load_hades() -> Any:
     """Build the HADES scorer. Caller must hold _model_lock."""
-    paths = _model_paths()
-    log.info("Loading HADES (first call only, this is slow): %s", paths)
     _importable()
     from HADES_CALCULATOR import HADES_score  # noqa: PLC0415 -- deliberately lazy
 
+    paths = _model_paths(HADES_score)
+    log.info("Loading HADES (first call only, this is slow): %s",
+             paths or "HADES_score's default paths")
     try:
         scorer = HADES_score(quiet=True, verify=VERIFY, **paths)
     except FileNotFoundError as exc:
@@ -150,6 +152,20 @@ def _load_hades() -> Any:
             "and HADES_X_TRAIN to a model you trained.") from exc
     log.info("HADES ready: %d ensemble members.", len(scorer.models))
     return scorer
+
+
+def _standardization_problem(smiles: str) -> str | None:
+    """Why the molecule HADES would score, once standardized, cannot be scored."""
+    from rdkit import Chem  # noqa: PLC0415 -- deliberately lazy
+    from HADES.featurize import Featurizer  # noqa: PLC0415
+
+    try:
+        standardized = Featurizer.standartize_mol(Chem.MolFromSmiles(smiles))
+    except Exception as exc:  # for one, RDKit valence errors on neutralization
+        return f"HADES cannot standardize it: {exc}"
+    if standardized.GetNumAtoms() == 0:
+        return "nothing is left once salts and counter-ions are stripped"
+    return None
 
 
 def _score_sync(requested: list[str]) -> dict[str, list[dict[str, Any]]]:
@@ -161,25 +177,23 @@ def _score_sync(requested: list[str]) -> dict[str, list[dict[str, Any]]]:
     exactly as sent is what keeps each score attached to its molecule.
 
     The gate looks at the molecule as written, but HADES scores it after
-    stripping salts. An input that is nothing but salts or counter-ions (NaCl,
-    acetic acid, water) is stripped to an empty molecule, every descriptor
-    comes back missing, and mean-imputation turns that into the same score
-    for all of them -- so such inputs are rejected here as well.
+    stripping the counter-ions on RDKit's default salt list and neutralizing
+    charges. An input made only of those (NaCl, acetic acid, water) is stripped
+    to an empty molecule, whose descriptors -- constants, and missing values
+    filled with training means -- give every such input the same score. Those
+    inputs are rejected here as well, as are inputs the standardization itself
+    fails on, which would otherwise fail the whole batch.
     """
     global _hades
     with _model_lock:
         _importable()
-        from rdkit import Chem  # noqa: PLC0415 -- deliberately lazy
-        from HADES.featurize import Featurizer, unscoreable_reason  # noqa: PLC0415
+        from HADES.featurize import unscoreable_reason  # noqa: PLC0415 -- deliberately lazy
 
         valid: list[tuple[int, str]] = []
         invalid: list[dict[str, Any]] = []
         for index, raw in enumerate(requested):
             candidate = raw.strip()
-            reason = unscoreable_reason(candidate)
-            if reason is None and Featurizer.standartize_mol(
-                    Chem.MolFromSmiles(candidate)).GetNumAtoms() == 0:
-                reason = "nothing is left once salts and counter-ions are stripped"
+            reason = unscoreable_reason(candidate) or _standardization_problem(candidate)
             if reason is None:
                 valid.append((index, candidate))
             else:
@@ -212,13 +226,16 @@ def _score_sync(requested: list[str]) -> dict[str, list[dict[str, Any]]]:
         "[0, 1]; higher means more similar to the approved oral drugs HADES "
         "was trained on. Takes a list of SMILES strings (a one-item list for a "
         "single molecule); pass all the molecules to score in one call, up to "
-        f"{MAX_BATCH}. Inputs that cannot be scored (unparseable, empty, "
-        "fragments with attachment points, or nothing but salts) are reported "
-        "in 'invalid' with a reason rather than failing the whole call. Salt "
-        "forms are scored as their parent molecule. Each entry carries "
-        "'index', its position in the input. A low "
-        "score for chemistry far outside the training distribution is not "
-        "evidence that a molecule is not drug-like."
+        f"{MAX_BATCH}. Pass each drug as its parent compound (free acid or "
+        "base): HADES strips common counter-ions such as Na+, K+, Cl- or "
+        "mesylate, but not others such as citrate, besylate or succinate, nor "
+        "the second parent of a 2:1 salt, and those change the score. Inputs "
+        "that cannot be scored (for example unparseable, empty, fragments with "
+        "attachment points, or nothing left once salts are stripped, such as "
+        "NaCl or water) are reported in 'invalid' with a reason rather than "
+        "failing the whole call. Each entry carries 'index', its position in "
+        "the input. A low score for chemistry far outside the training "
+        "distribution is not evidence that a molecule is not drug-like."
     ),
     annotations=ToolAnnotations(read_only_hint=True, open_world_hint=False),
 )
@@ -260,7 +277,6 @@ async def hades_score(
 def _selftest(smiles: list[str]) -> int:
     """Score some molecules and report on stderr. Bypasses MCP entirely."""
     samples = smiles or ["CCO", "c1ccccc1", "CC(=O)Oc1ccccc1C(=O)O", "not-a-molecule"]
-    print(f"models: {_model_paths()}", file=sys.stderr)
     report = _score_sync(samples)
     for entry in report["invalid"]:
         print(f"  REJECTED  {entry['smiles']!r}: {entry['reason']}", file=sys.stderr)
@@ -289,8 +305,8 @@ def main():
         raise SystemExit(_selftest(args.selftest))
     if args.http:
         # Read the environment only here, so a bad HADES_PORT cannot stop stdio mode.
-        host = args.host or os.environ.get("HADES_HOST") or "127.0.0.1"
-        port = args.port or int(os.environ.get("HADES_PORT") or 8000)
+        host = args.host if args.host is not None else os.environ.get("HADES_HOST") or "127.0.0.1"
+        port = args.port if args.port is not None else int(os.environ.get("HADES_PORT") or 8000)
         log.info("Serving HADES over streamable HTTP on %s:%d/mcp", host, port)
         anyio.run(lambda: mcp.run_streamable_http_async(host=host, port=port))
     else:
