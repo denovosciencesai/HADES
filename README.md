@@ -1,8 +1,67 @@
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
-HADES (Holistic AI-based Drug-likeness Estimation Score) is a soft-voting ensemble of five ML models (HistGradientBoosting, RandomForest, CatBoost, XGBoost, and LightGBM) that predicts the oral drug-likeness of a molecule from its SMILES string.
+[![Paper: J. Chem. Inf. Model. 2026](https://img.shields.io/badge/paper-J.%20Chem.%20Inf.%20Model.%202026-1f6feb)](https://doi.org/10.1021/acs.jcim.5c02953)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue)](environment.yml)
+[![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2)](#4-use-hades-from-claude-and-other-mcp-clients)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](#claude-code-plugin)
 
-You can score molecules with the provided pretrained HADES model (https://doi.org/10.1021/acs.jcim.5c02953), or train your own model on your own labelled compounds.
+HADES (Holistic AI-based Drug-likeness Estimation Score) predicts the oral
+drug-likeness of small molecules from their SMILES strings. It returns a score
+between 0 and 1: the mean predicted probability of a soft-voting ensemble of five
+machine-learning classifiers (HistGradientBoosting, RandomForest, CatBoost,
+XGBoost and LightGBM) trained on Mordred, ADMET-AI and QED descriptors.
+
+This repository is the authors' implementation of
+[Petrosyan et al., *J. Chem. Inf. Model.* 2026, 66 (16), 9944–9960](https://doi.org/10.1021/acs.jcim.5c02953).
+It ships the paper's pretrained models and lets you:
+
+- score molecules from Python or the command line (CSV in, CSV out);
+- score them from Claude Code, Claude Desktop or any other MCP client, through the
+  bundled MCP server and Claude Code plugin;
+- train a new HADES ensemble on your own labelled compounds.
+
+**Contents:** [Quick start](#quick-start) ·
+[Setup](#setup) ·
+[Scoring](#1-score-molecules-with-the-provided-model) ·
+[Training](#2-train-your-own-model) ·
+[MCP server and Claude Code plugin](#4-use-hades-from-claude-and-other-mcp-clients) ·
+[Model integrity](#model-artifacts-and-integrity) ·
+[Tests](#tests) ·
+[How to cite](#how-to-cite) ·
+[FAQ](#faq)
+
+## Quick start
+
+```bash
+git clone https://github.com/denovosciencesai/HADES.git
+cd HADES
+conda env create -f environment.yml
+conda activate hades
+python HADES_CALCULATOR.py -i data_to_test.csv -o scores.csv
+```
+
+`scores.csv` is `data_to_test.csv` with a `HADES_Score` column added. From Python:
+
+```python
+from HADES_CALCULATOR import HADES_score
+
+hades = HADES_score()
+hades.score("CCO")                # 0.0178...
+hades.score(["CCO", "c1ccccc1"])  # DataFrame with SMILES and HADES_Score columns
+```
+
+### How it works
+
+Each SMILES is standardized (salts stripped, charges neutralized, stereochemistry
+removed) and described by 298 molecular descriptors: Mordred descriptors, ADMET
+properties predicted by ADMET-AI, and six of the eight properties behind QED.
+Each of the five classifiers predicts the probability that the molecule belongs
+with the approved oral drugs, and the HADES score is the mean of the five.
+
+The shipped models come from the paper's dataset of 8,106 compounds, 1,488
+approved oral drugs and 6,618 non-drug molecules, split 80/20 into the training
+and test sets in `train_test_saved/`.
 
 ## Requirements
 
@@ -31,6 +90,10 @@ directory, and adds two commands, `hades-score` and `hades-train`, which take th
 same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`. The
 default model and training-data paths are relative to the current directory, so
 run them from the repository root, or pass `--models-dir` and `--x-train`.
+`pip install -e ".[mcp]"` adds a third command, `hades-mcp`, the MCP server of
+[section 4](#4-use-hades-from-claude-and-other-mcp-clients); it finds the
+repository's models from any directory and is configured through environment
+variables instead.
 
 ## Repository layout
 
@@ -50,6 +113,8 @@ run them from the repository root, or pass `--models-dir` and `--x-train`.
 ├── HADES_CALCULATOR.py                          # script to calculate HADES_score from the terminal or a Jupyter notebook, for single molecules or batches
 ├── train_your_HADES.py                          # script to train your own HADES model on your own data
 ├── parameters_test.py                           # a small hyperparameter set for testing custom parameter spaces during HADES training
+├── hades_mcp.py                                # MCP server: HADES as a tool for Claude and other AI assistants
+├── .claude-plugin/                             # Claude Code plugin manifest and plugin marketplace for this repository
 ├── tests/                                      # pytest suite: golden scores and regression checks
 ├── environment.yml                             # defines the HADES conda environment
 ├── pyproject.toml                              # packaging metadata (`pip install -e .`)
@@ -322,6 +387,160 @@ custom_hades = HADES_score(models_dir="quick_test_run/models", x_train_parquet="
 custom_hades.score(['C1CCCC1', 'c1ccccc1'])
 ```
 
+---
+
+## 4. Use HADES from Claude and other MCP clients
+
+`hades_mcp.py` serves HADES over the [Model Context Protocol](https://modelcontextprotocol.io)
+(MCP), so an AI assistant can score molecules while it works: ask Claude to rank a
+set of analogues by HADES score and it calls HADES directly. The server exposes one
+tool, `hades_score`, which takes a list of SMILES and returns a score for each
+molecule, plus a reason for every input it could not score.
+
+The server runs on your machine, in the `hades` environment, which needs the MCP
+SDK added once:
+
+```bash
+conda activate hades
+pip install "mcp==2.3.0"
+```
+
+From a checkout, `pip install -e ".[mcp]"` does the same and also installs HADES
+itself, with a `hades-mcp` command; it re-applies every pin in `requirements.txt`
+too. The environment works on native Windows as well as Linux (macOS is
+untested). Install it on the system that runs your MCP client: a Windows client
+cannot use the plugin with an environment that lives in WSL (see
+[Other MCP clients](#other-mcp-clients)).
+
+### Claude Code plugin
+
+This repository is a [Claude Code plugin](https://code.claude.com/docs/en/plugins)
+and its own plugin marketplace, `denovo-hades`. In Claude Code 2.1.275 or later:
+
+```
+/plugin install hades --marketplace denovosciencesai/HADES
+```
+
+On older versions, add the marketplace first (`/plugin marketplace add denovosciencesai/HADES`),
+then run `/plugin install hades@denovo-hades`. To install from a local clone
+instead of GitHub, add the marketplace by path: `/plugin marketplace add /path/to/HADES`.
+
+The plugin asks for one setting: the absolute path of the `hades` environment's
+Python interpreter. To print it:
+
+```bash
+conda run -n hades python -c "import sys; print(sys.executable)"
+```
+
+From a shell, the same install is:
+
+```bash
+claude plugin marketplace add denovosciencesai/HADES
+claude plugin install hades@denovo-hades --config python=/home/you/miniconda3/envs/hades/bin/python
+```
+
+A shell install never prompts, so pass the interpreter with `--config`, or set it
+later with `/plugin configure hades@denovo-hades`. Write the path out in full:
+`~` is not expanded, and a wrong path only shows up when the server fails to
+start. On Windows the path looks like
+`C:/Users/you/miniconda3/envs/hades/python.exe`. Check the server with `/mcp`;
+the tool appears as `mcp__plugin_hades_hades__hades_score`. The plugin was tested
+with Claude Code 2.1.299 on Windows.
+
+A GitHub install keeps two copies of the repository, models included: the
+marketplace clone and the plugin cache, about 210 MB together. Installing from a
+local clone copies that whole directory, untracked files included, so install
+from a clean checkout. The plugin is pinned to a version, and third-party
+marketplaces do not auto-update by default, so pull a new release with
+`claude plugin update hades@denovo-hades`.
+
+The plugin runs one thing: `hades_mcp.py`, with the interpreter you configured,
+on your machine. Scoring is local. Before loading the pickled models, the server
+checks them against `SHA256SUMS`, as described in
+[Model artifacts and integrity](#model-artifacts-and-integrity).
+
+To work on the plugin itself, start Claude Code with `claude --plugin-dir .` from
+a checkout and run `/plugin configure hades` once. After editing `hades_mcp.py` or
+the `HADES` package, reconnect the server in `/mcp`, or restart Claude Code, so a
+new server process picks up the change.
+
+### Other MCP clients
+
+Every MCP client needs the same two things: the `hades` environment's Python and
+the path to `hades_mcp.py`. In Claude Code without the plugin:
+
+```bash
+claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /path/to/HADES/hades_mcp.py
+```
+
+`--scope user` makes the tool available in every project, as the plugin does;
+without it, it exists only in the directory where you ran the command.
+
+In Claude Desktop (`claude_desktop_config.json`), and in clients that use the
+same format:
+
+```json
+{
+  "mcpServers": {
+    "hades": {
+      "command": "/home/you/miniconda3/envs/hades/bin/python",
+      "args": ["/path/to/HADES/hades_mcp.py"]
+    }
+  }
+}
+```
+
+On Windows, use the environment's `python.exe` and Windows paths, for example
+`C:/Users/you/miniconda3/envs/hades/python.exe` and `C:/path/to/HADES/hades_mcp.py`.
+
+If your client runs on Windows but the `hades` environment lives in WSL, launch
+the server through WSL: `"command": "wsl.exe"` with
+`"args": ["-d", "Ubuntu", "-e", "/home/you/miniconda3/envs/hades/bin/python", "/home/you/HADES/hades_mcp.py"]`.
+The plugin cannot do this, so with Claude Code use `claude mcp add` the same way
+(`claude mcp add --scope user hades -- wsl.exe -d Ubuntu -e ...`), or run Claude
+Code inside WSL.
+
+### What the tool returns
+
+```json
+{
+  "results": [{"index": 0, "smiles": "CCO", "hades_score": 0.0178}],
+  "invalid": [{"index": 1, "smiles": "NOT_A_SMILES", "reason": "RDKit cannot parse it"}]
+}
+```
+
+`index` is each entry's position in the input list. A call takes up to 100 SMILES,
+which keeps a full result well inside the output limits MCP clients apply. The
+models load on the first call, which takes a while; later calls are fast.
+
+### Configuration
+
+The server reads these environment variables, all optional. Where to set them
+depends on the client:
+
+- **Claude Code**, plugin or `claude mcp add`: the server inherits the environment
+  Claude Code was started from, so export them first. With `claude mcp add` you
+  can also pass them with `-e NAME=value`.
+- **Claude Desktop and most other clients** pass only a few variables to the
+  servers they start. Add an `env` block to the server entry:
+  `"env": {"HADES_MODELS_DIR": "/abs/path/run/models", "HADES_X_TRAIN": "/abs/path/run/X_train.parquet"}`.
+- **Through `wsl.exe`**, Windows variables reach WSL only when listed in
+  `WSLENV`, for example `WSLENV=HADES_MODELS_DIR/p:HADES_X_TRAIN/p`.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `HADES_MODELS_DIR` | the shipped models | Score with an ensemble you trained ([section 3](#3-use-a-model-you-trained)) |
+| `HADES_X_TRAIN` | the one that goes with the shipped models | The `X_train.parquet` that goes with `HADES_MODELS_DIR` |
+| `HADES_VERIFY` | `auto` | Checksum check before loading the models: `auto`, `require` or `off` |
+| `HADES_MAX_BATCH` | `100` | Maximum SMILES per call |
+| `HADES_REPO` | the directory of `hades_mcp.py` | The HADES checkout to import HADES and its shipped models from |
+
+To check the server without any client, score a few molecules directly:
+
+```bash
+python hades_mcp.py --selftest CCO c1ccccc1
+```
+
 ## Tests
 
 A small pytest suite guards the two things that have broken silently before: the
@@ -342,7 +561,12 @@ default model and training-data paths resolve. It checks:
   raises `ValueError`;
 - that the `SMILES` column of the training parquet is found by name, and that
   descriptors which do not match the models' features raise instead of scoring;
-- that output printed before scoring reaches a pipe exactly once.
+- that output printed before scoring reaches a pipe exactly once;
+- with the MCP SDK installed, that the MCP server keeps each score matched to its
+  input, that real client sessions work over stdio, and that output printed
+  during a call reaches stderr instead of the JSON-RPC stream (`tests/test_mcp.py`,
+  skipped without the SDK; it starts the server in subprocesses, so it adds about
+  a minute).
 
 One more test trains a model end to end on `data_to_test.csv` and scores with it.
 It takes about 16 minutes, so it is skipped by default:
@@ -371,3 +595,72 @@ The feature-selection sweep opts back out with `disable=False`
 needs to show progress. It is the one progress bar you will see during a run —
 see [How long training takes](#how-long-training-takes) for what to expect from
 it.
+
+---
+
+## How to cite
+
+If you use HADES, please cite the paper:
+
+> Petrosyan, N.; Matevosyan, H.; Tirosyan, I.; Gabrielyan, Y.; Gevorgyan, S.;
+> Harutyunyan, V.; Matevosyan, M.; Zakaryan, H. Machine Learning-Based Soft Voting
+> Ensemble Model for the Prediction of Oral Drug-Likeness of Chemical Structures.
+> *J. Chem. Inf. Model.* **2026**, *66* (16), 9944–9960.
+> <https://doi.org/10.1021/acs.jcim.5c02953>
+
+```bibtex
+@article{petrosyan2026hades,
+  title   = {Machine Learning-Based Soft Voting Ensemble Model for the Prediction of Oral Drug-Likeness of Chemical Structures},
+  author  = {Petrosyan, Narek and Matevosyan, Hovhannes and Tirosyan, Irina and Gabrielyan, Yeva and Gevorgyan, Smbat and Harutyunyan, Vardan and Matevosyan, Mher and Zakaryan, Hovakim},
+  journal = {Journal of Chemical Information and Modeling},
+  volume  = {66},
+  number  = {16},
+  pages   = {9944--9960},
+  year    = {2026},
+  doi     = {10.1021/acs.jcim.5c02953}
+}
+```
+
+GitHub's **Cite this repository** button, generated from `CITATION.cff`, gives the
+same reference in APA and BibTeX.
+
+## FAQ
+
+**What does a HADES score mean?**
+It is a number between 0 and 1: the mean probability, across the five models,
+that a molecule belongs with the approved oral drugs HADES was trained on. Higher
+means more similar to approved oral drugs. Use it to rank and prioritize
+compounds; it is not a probability that a compound will succeed in the clinic.
+
+**How is HADES different from QED or Lipinski's rule of five?**
+The rule of five and QED judge a molecule from a few physicochemical properties,
+through fixed cutoffs or desirability functions. HADES is trained on data: it uses
+most of QED's properties together with Mordred descriptors and ADMET-AI
+predictions, in models fitted to separate approved oral drugs from non-drug
+molecules. See the paper for how it compares with other drug-likeness scores.
+
+**Which molecules can it score?**
+Whole molecules that RDKit can parse. Salts and counter-ions are stripped and
+charges neutralized first, so a salt form scores as its parent molecule. Empty
+inputs and fragments with attachment points (`*`) are rejected rather than scored;
+the MCP server also rejects inputs that are nothing but salts, such as sodium
+chloride. Scores mean most for drug-sized organic molecules like the ones in the
+training data; a low score for chemistry far outside it is not evidence that a
+molecule is not drug-like.
+
+**How fast is it?**
+After the models load, about 30 ms per molecule on a laptop CPU (an Intel Core 5
+120U: 200 compounds in 5.6 s, 2,000 in 60.4 s), so 10,000 molecules take about
+five minutes.
+
+**Can I train HADES on my own data?**
+Yes. See [Train your own model](#2-train-your-own-model), then
+[Use a model you trained](#3-use-a-model-you-trained).
+
+**Can an AI assistant use HADES?**
+Yes, through the MCP server. See
+[Use HADES from Claude and other MCP clients](#4-use-hades-from-claude-and-other-mcp-clients).
+
+## License
+
+MIT. See [LICENSE](LICENSE).

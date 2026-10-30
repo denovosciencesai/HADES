@@ -1,0 +1,17 @@
+{
+  "name": "denovo-hades",
+  "description": "HADES oral drug-likeness scoring for Claude Code, by Denovo Sciences",
+  "owner": {
+    "name": "Denovo Sciences",
+    "url": "https://denovosciences.ai"
+  },
+  "plugins": [
+    {
+      "name": "hades",
+      "source": "./",
+      "description": "Score the oral drug-likeness of molecules from SMILES with the HADES ensemble (local MCP server)",
+      "category": "science",
+      "tags": ["drug-discovery", "cheminformatics", "drug-likeness", "admet"]
+    }
+  ]
+}

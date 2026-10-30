@@ -28,6 +28,10 @@ Run `pytest -m slow` too if your change touches training (`train_your_HADES.py`,
 `HADES/correlation_drop.py`, `HADES/hyperparameter_optimization.py`,
 `HADES/param_spaces.py`).
 
+`tests/test_mcp.py` runs only when the MCP SDK is installed
+(`pip install -e ".[mcp]"`); install it if your change touches `hades_mcp.py` or
+the plugin. It starts the server in subprocesses, so it adds about a minute.
+
 ## If a change moves the scores
 
 `tests/test_hades.py` pins three molecules to recorded scores (`GOLDEN`). If
@@ -64,3 +68,10 @@ write_manifest("HADES_saved_models")
 - Describe what changed and why, and link the issue if there is one.
 - Add or update a test when you fix a bug, so it cannot come back unnoticed.
 - Make sure `pytest` passes.
+
+## Releasing
+
+Bump the version in `pyproject.toml`, `HADES/__init__.py`, `CITATION.cff` and
+`.claude-plugin/plugin.json` together. Claude Code users get a new version of
+the plugin only when the version in `plugin.json` changes; until then,
+`claude plugin update` keeps them on the copy they have.

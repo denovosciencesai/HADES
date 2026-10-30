@@ -8,7 +8,7 @@ should be reported privately rather than in a public issue.
 
 Report privately through GitHub:
 **Security → Report a vulnerability** on this repository
-(<https://github.com/denovosciencesai/HADES-Internal/security/advisories/new>).
+(<https://github.com/denovosciencesai/HADES/security/advisories/new>).
 
 If you cannot use GitHub, email **<narekp@denovosciences.ai>**.
 
