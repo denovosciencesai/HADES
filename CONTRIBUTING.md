@@ -72,6 +72,7 @@ with `verify="require"`, so it also fails if a model file no longer matches
 `tests/test_mcp.py` runs only when the MCP SDK is installed
 (`pip install -e ".[mcp]"`); install it if your change touches `hades_mcp.py` or
 the plugin. It starts the server in subprocesses, so it adds about two minutes.
+CI installs `.[dev,mcp]`, so it always runs there.
 
 ## If a change moves the scores
 
