@@ -93,6 +93,10 @@ same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`, a
 `[mcp]` extra. The trained models and the descriptor spec are installed alongside
 the code, so all three work from any directory.
 
+**Using HADES from Claude or another AI assistant?** After this, follow
+[MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants) to add
+the MCP SDK and connect it.
+
 ## Score molecules
 
 In Python, `score()` returns a float for one SMILES and a DataFrame (columns
