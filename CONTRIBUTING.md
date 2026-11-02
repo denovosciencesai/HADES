@@ -9,15 +9,20 @@ opening an issue.
 ```bash
 conda env create -f environment.yml
 conda activate hades
-pip install -e .
+pip install -e ".[dev]"
 ```
+
+The `[dev]` extra adds `pytest` and `ruff`; the environment itself carries only
+what HADES needs at runtime. CI installs the same extra, so it runs the checks
+you run.
 
 HADES targets Python 3.10 only. The pickled models and the pinned stack were
 built on it.
 
 ## Running the tests
 
-Run from the repository root, so the default model and data paths resolve:
+Run from a checkout -- the suite reads the paper's train/test split, which the
+installed package does not carry:
 
 ```bash
 pytest            # ~15 seconds
@@ -41,7 +46,7 @@ verification still passes:
 ```python
 from HADES.integrity import write_manifest
 
-write_manifest("HADES_saved_models")
+write_manifest("HADES/data/models")
 ```
 
 ## Style

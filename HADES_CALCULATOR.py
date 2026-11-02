@@ -3,8 +3,63 @@ from HADES.featurize import Featurizer, unscoreable_reason
 from HADES.integrity import verify_model_dir
 
 import argparse, contextlib, glob, os
+from importlib.resources import files
 from typing import Union
 import joblib, numpy as np, pandas as pd
+
+# Data the package carries with it. `files()` resolves to the HADES package
+# directory wherever that ended up -- a repository checkout or site-packages --
+# so these defaults do not depend on the directory the caller happens to be in.
+_DATA_DIR = files("HADES") / "data"
+DEFAULT_MODELS_DIR = os.fspath(_DATA_DIR / "models")
+DEFAULT_FEATURE_SPEC = os.fspath(_DATA_DIR / "feature_spec.parquet")
+
+
+def _spec_from_x_train(x_train_parquet):
+    """
+    Recovers the descriptor order and imputation means from a training matrix.
+    Args:
+        x_train_parquet (str): Path to a parquet with a "SMILES" column; every
+            other column is treated as a descriptor.
+    Raises:
+        ValueError: If there is no "SMILES" column, leaving no way to tell which
+            columns are descriptors.
+    Returns:
+        tuple[list[str], pd.Series]: Descriptor names in training order, and
+            their means indexed by name.
+    """
+    x_train = pd.read_parquet(x_train_parquet)
+    # Drop SMILES by name: dropping by position would silently discard a real
+    # descriptor from any file whose columns are ordered differently.
+    if "SMILES" not in x_train.columns:
+        raise ValueError(f"{x_train_parquet} has no 'SMILES' column; cannot tell "
+                         f"which of its columns are descriptors")
+    cols = list(x_train.columns.drop("SMILES"))
+    return cols, x_train[cols].mean()
+
+
+def _packaged_spec():
+    """
+    Loads the descriptor order and means shipped inside the package.
+
+    Scoring needs only these two things out of the paper's `X_train.parquet`, so
+    the package carries them as a few KB rather than the 13 MB training split.
+    Regenerate after retraining on a different descriptor set:
+
+        python -c "import HADES_CALCULATOR as c, pandas as pd; \
+                   cols, means = c._spec_from_x_train('train_test_saved/X_train.parquet'); \
+                   pd.DataFrame({'descriptor': cols, 'mean': means.to_numpy()}) \
+                     .to_parquet(c.DEFAULT_FEATURE_SPEC, index=False)"
+
+    `tests/test_hades.py` fails if the shipped file and that training split
+    disagree.
+    Returns:
+        tuple[list[str], pd.Series]: Descriptor names in training order, and
+            their means indexed by name.
+    """
+    spec = pd.read_parquet(DEFAULT_FEATURE_SPEC)
+    cols = list(spec["descriptor"])
+    return cols, pd.Series(spec["mean"].to_numpy(), index=cols)
 
 
 class HADES_score:
@@ -18,19 +73,23 @@ class HADES_score:
     there into an ensemble, and builds a `Featurizer` matching the training
     descriptor columns.
     """
-    def __init__(self, models_dir="./HADES_saved_models",
-                 x_train_parquet="./train_test_saved/X_train.parquet", quiet=True, fillna="mean",
-                 verify="auto"):
+    def __init__(self, models_dir=DEFAULT_MODELS_DIR, x_train_parquet=None,
+                 quiet=True, fillna="mean", verify="auto"):
         """
         Args:
             models_dir (str): Directory containing trained model `.pkl` files.
                 Every file found here is loaded and included in the scoring ensemble,
-                keyed by filename (without extension).
-            x_train_parquet (str): Path to the training feature parquet. Its columns
-                (excluding the "SMILES" column, which it must contain) define the
-                expected descriptor order, and their means are used for
-                mean-imputation. Raises ValueError if that order does not match the
-                features any model was trained on.
+                keyed by filename (without extension). Defaults to the ensemble
+                packaged with HADES.
+            x_train_parquet (str, optional): Path to a training feature parquet. Its
+                columns (excluding the "SMILES" column, which it must contain) define
+                the expected descriptor order, and their means are used for
+                mean-imputation. Defaults to None, which uses the descriptor order and
+                means packaged with HADES -- the same values the paper's
+                `X_train.parquet` yields, without shipping the training split. Pass a
+                path after retraining on a different descriptor set. Raises ValueError
+                if the resulting order does not match the features any model was
+                trained on.
             quiet (bool): If True, suppresses stdout/stderr noise from the featurizer
                 during construction and scoring. Defaults to True.
             fillna (str or scalar or None): Strategy for filling missing/invalid
@@ -47,14 +106,11 @@ class HADES_score:
         """
         self.quiet = quiet
         self.fillna = fillna
-        x_train = pd.read_parquet(x_train_parquet)
-        # Drop SMILES by name: dropping by position would silently discard a real
-        # descriptor from any file whose columns are ordered differently.
-        if "SMILES" not in x_train.columns:
-            raise ValueError(f"{x_train_parquet} has no 'SMILES' column; cannot tell "
-                             f"which of its columns are descriptors")
-        self.descriptor_cols = list(x_train.columns.drop("SMILES"))
-        self._train_means = x_train[self.descriptor_cols].mean()
+        feature_source = x_train_parquet or DEFAULT_FEATURE_SPEC
+        if x_train_parquet is None:
+            self.descriptor_cols, self._train_means = _packaged_spec()
+        else:
+            self.descriptor_cols, self._train_means = _spec_from_x_train(x_train_parquet)
         model_paths = glob.glob(os.path.join(models_dir, "*.pkl"))
         if not model_paths:
             # Without this an empty or mistyped directory loads no models and every
@@ -69,7 +125,7 @@ class HADES_score:
         for name, model in self.models.items():
             expected = getattr(model, "feature_names_in_", None)
             if expected is not None and list(expected) != self.descriptor_cols:
-                raise ValueError(f"Descriptor columns in {x_train_parquet} do not match "
+                raise ValueError(f"Descriptor columns in {feature_source} do not match "
                                  f"the features model {name!r} was trained on")
         with self._q():
             self.featurizer = Featurizer.from_columns(self.descriptor_cols)
@@ -198,10 +254,12 @@ def main():
     p.add_argument("-i", "--input", dest="input_csv", help="Path to input CSV")
     p.add_argument("-o", "--output", dest="output_csv", help="Path to write output CSV")
     p.add_argument("--smiles-col", default="SMILES")
-    p.add_argument("--models-dir", default="./HADES_saved_models",
-                   help="Directory containing trained model .pkl files")
-    p.add_argument("--x-train", dest="x_train_parquet", default="./train_test_saved/X_train.parquet",
-                   help="Path to X_train.parquet used to derive descriptor columns and fill-na means")
+    p.add_argument("--models-dir", default=DEFAULT_MODELS_DIR,
+                   help="Directory containing trained model .pkl files "
+                        "(default: the ensemble packaged with HADES)")
+    p.add_argument("--x-train", dest="x_train_parquet", default=None,
+                   help="Path to an X_train.parquet to derive descriptor columns and "
+                        "fill-na means from (default: the spec packaged with HADES)")
     p.add_argument("--verify", choices=("auto", "require", "off"), default="auto",
                    help="Check the model files against models-dir/SHA256SUMS before "
                         "unpickling them: 'auto' verifies when a manifest is present, "

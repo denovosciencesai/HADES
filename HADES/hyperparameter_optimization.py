@@ -1,4 +1,3 @@
-import pandas as pd
 import optuna
 from optuna.samplers import TPESampler
 from sklearn.model_selection import cross_val_score

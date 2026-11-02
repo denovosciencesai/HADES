@@ -4,25 +4,29 @@ Deliberately small. The point is to catch two things that have gone wrong
 before and would otherwise go unnoticed: a silent change in the scores, and
 rows losing track of the molecule they came from.
 
-Run from the repository root, so the default `./HADES_saved_models` and
-`./train_test_saved` paths resolve:
+Runs from any working directory: HADES resolves its models and descriptor
+spec relative to the installed package, not to the caller's cwd.
 
     pytest
 """
 
 import subprocess
 import sys
+from pathlib import Path
 
 import pytest
 
 # Before pandas: importing pandas first loads an older libstdc++ than RDKit needs.
+import HADES_CALCULATOR
 from HADES_CALCULATOR import HADES_score
 
 import pandas as pd
 
-X_TRAIN = "./train_test_saved/X_train.parquet"
+# Repository-only: the paper's training split is not shipped with the package,
+# so these tests reach for it by path instead of assuming a working directory.
+X_TRAIN = str(Path(__file__).resolve().parent.parent / "train_test_saved" / "X_train.parquet")
 
-# Measured with the models in HADES_saved_models/, whose exact bytes SHA256SUMS
+# Measured with the models in HADES/data/models/, whose exact bytes SHA256SUMS
 # records. If one of these moves, the featurizer, the models or the descriptor
 # set changed -- update these numbers only when that was the intention.
 GOLDEN = {
@@ -138,3 +142,29 @@ def test_non_string_smiles_are_skipped(hades):
 def test_models_dir_without_models_raises(tmp_path):
     with pytest.raises(FileNotFoundError, match="No .pkl model files"):
         HADES_score(models_dir=str(tmp_path))
+
+
+def test_packaged_spec_matches_the_training_split():
+    """The shipped spec must still say what X_train.parquet says.
+
+    It is derived from that file, so this is the check that keeps the two from
+    drifting -- and the record of how the shipped file was produced.
+    """
+    packaged_cols, packaged_means = HADES_CALCULATOR._packaged_spec()
+    train_cols, train_means = HADES_CALCULATOR._spec_from_x_train(X_TRAIN)
+    assert packaged_cols == train_cols
+    assert packaged_means.to_numpy() == pytest.approx(train_means.to_numpy())
+
+
+def test_defaults_do_not_depend_on_the_working_directory(tmp_path):
+    """HADES must score from any folder, not only from the repository root.
+
+    Regression test for the packaging fix: the defaults were `./HADES_saved_models`
+    and `./train_test_saved/X_train.parquet`, so an installed copy found neither
+    unless the caller happened to be standing in the repository.
+    """
+    script = ("from HADES_CALCULATOR import HADES_score\n"
+              "print(HADES_score(verify='require').score('CCO'))\n")
+    out = subprocess.run([sys.executable, "-c", script], cwd=tmp_path,
+                         stdout=subprocess.PIPE, text=True, check=True).stdout
+    assert float(out.strip()) == pytest.approx(GOLDEN["CCO"], abs=TOLERANCE)

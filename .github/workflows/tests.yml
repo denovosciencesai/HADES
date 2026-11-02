@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        # Login shell, so the conda environment is active in every step.
+        shell: bash -el {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: mamba-org/setup-micromamba@v2
+        with:
+          environment-file: environment.yml
+          # A cold build installs torch and chemprop and takes several minutes,
+          # a cached one ~1 min. environment.yml only points at requirements.txt
+          # with `-r`, so the key hashes both files -- otherwise a changed pin
+          # would be served a stale cached environment.
+          cache-environment: true
+          cache-environment-key: env-${{ hashFiles('environment.yml', 'requirements.txt') }}
+
+      - name: Verify model checksums
+        run: cd HADES/data/models && sha256sum -c SHA256SUMS
+
+      - name: Install HADES and its dev tooling
+        # The runtime pins are already in the environment; this adds pytest and
+        # ruff from the [dev] extra, so CI installs what CONTRIBUTING.md tells a
+        # contributor to install rather than its own list.
+        run: pip install -e ".[dev]"
+
+      - name: Run tests
+        # Fast checks only; `-m slow` trains a model end to end (~16 minutes).
+        run: pytest -q
+
+      - name: Lint
+        # Narrow by design: a reintroduced tab (W191/E101) and pyflakes (F).
+        # The selection lives in pyproject.toml, not here.
+        run: ruff check .
