@@ -32,15 +32,16 @@ cannot use the plugin with an environment that lives in WSL (see
 ## Claude Code plugin
 
 This repository is a [Claude Code plugin](https://code.claude.com/docs/en/plugins)
-and its own plugin marketplace, `denovo-hades`. In Claude Code 2.1.275 or later:
+and its own plugin marketplace, `denovo-hades`. In Claude Code, add the marketplace,
+then install the plugin from it:
 
 ```
-/plugin install hades --marketplace denovosciencesai/HADES
+/plugin marketplace add denovosciencesai/HADES
+/plugin install hades@denovo-hades
 ```
 
-On older versions, add the marketplace first (`/plugin marketplace add denovosciencesai/HADES`),
-then run `/plugin install hades@denovo-hades`. To install from a local clone
-instead of GitHub, add the marketplace by path: `/plugin marketplace add /path/to/HADES`.
+To install from a local clone instead of GitHub, add the marketplace by path:
+`/plugin marketplace add /path/to/HADES`.
 
 The plugin asks for one setting: the absolute path of the `hades` environment's
 Python interpreter. To print it:

@@ -1,16 +1,19 @@
-![HADES](hades_logo.svg)
+![HADES drug-likeness score logo](hades_logo.svg)
 
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
 [![Paper: J. Chem. Inf. Model. 2026](https://img.shields.io/badge/paper-J.%20Chem.%20Inf.%20Model.%202026-1f6feb)](https://doi.org/10.1021/acs.jcim.5c02953)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue)](environment.yml)
-[![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2)](#use-hades-from-claude-mcp)
+[![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2)](#mcp-server-use-hades-from-claude-and-other-ai-assistants)
 [![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](docs/mcp.md#claude-code-plugin)
 
-HADES (Holistic AI-based Drug-likeness Estimation Score) predicts the oral
-drug-likeness of small molecules from their SMILES strings. It returns a score
-between 0 and 1: the mean predicted probability of a soft-voting ensemble of five
+HADES (Holistic AI-based Drug-likeness Estimation Score) is an open-source Python
+package, command-line tool and MCP server that predicts the oral drug-likeness of
+small molecules from their SMILES strings. It returns a score from 0 to 1, a
+data-driven complement to QED and Lipinski's rule of five, for ranking and
+filtering compounds in drug discovery, virtual screening and medicinal chemistry.
+The score is the mean predicted probability of a soft-voting ensemble of five
 machine-learning classifiers (HistGradientBoosting, RandomForest, CatBoost,
 XGBoost and LightGBM) trained on Mordred, ADMET-AI and QED descriptors.
 
@@ -27,7 +30,7 @@ It ships the paper's pretrained models and lets you:
 [Installation](#installation) ·
 [Scoring](#score-molecules) ·
 [Training](#train-your-own-model) ·
-[MCP and Claude](#use-hades-from-claude-mcp) ·
+[MCP and Claude](#mcp-server-use-hades-from-claude-and-other-ai-assistants) ·
 [Model integrity](#model-files-and-integrity) ·
 [How to cite](#how-to-cite) ·
 [FAQ](#faq)
@@ -83,10 +86,10 @@ Optionally, install the project into the environment as well:
 pip install -e .
 ```
 
-That makes `from HADES import HADES_score, HADESTrainer` importable from any
-directory and adds the commands `hades-score` and `hades-train`, which take the
+That makes `from HADES import HADES_score, HADESTrainer` (the same classes as
+`HADES_CALCULATOR` and `train_your_HADES`) importable from any directory and adds the commands `hades-score` and `hades-train`, which take the
 same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`, and
-`hades-mcp`, the [MCP server](#use-hades-from-claude-mcp), which also needs the
+`hades-mcp`, the [MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants), which also needs the
 `[mcp]` extra. The trained models and the descriptor spec are installed alongside
 the code, so all three work from any directory.
 
@@ -154,10 +157,10 @@ python HADES_CALCULATOR.py --models-dir my_model/models --x-train my_model/X_tra
 custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_model/X_train.parquet")
 ```
 
-## Use HADES from Claude (MCP)
+## MCP server: use HADES from Claude and other AI assistants
 
-`hades_mcp.py` serves HADES over the [Model Context Protocol](https://modelcontextprotocol.io),
-so Claude and other AI assistants can score molecules while they work. It exposes
+`hades_mcp.py` is a cheminformatics MCP server: it serves HADES over the
+[Model Context Protocol](https://modelcontextprotocol.io), so Claude and other AI assistants can score molecules while they work. It exposes
 one tool, `hades_score`, which takes a list of SMILES and returns a score for each,
 plus a reason for every input it could not score. Scoring runs on your machine.
 
@@ -172,7 +175,8 @@ Then install the Claude Code plugin, which asks for the path of the environment'
 Python (`conda run -n hades python -c "import sys; print(sys.executable)"`):
 
 ```
-/plugin install hades --marketplace denovosciencesai/HADES
+/plugin marketplace add denovosciencesai/HADES
+/plugin install hades@denovo-hades
 ```
 
 Or register the server with Claude Code directly, or with any other MCP client by
@@ -183,8 +187,8 @@ claude mcp add --scope user hades -- /path/to/envs/hades/bin/python /path/to/HAD
 ```
 
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
-[docs/mcp.md](docs/mcp.md) covers older Claude Code versions, Claude Desktop and
-other clients, Windows and WSL, the tool's output and its configuration.
+[docs/mcp.md](docs/mcp.md) covers installing from a shell or a local clone, Claude
+Desktop and other clients, Windows and WSL, the tool's output and its configuration.
 
 ## Model files and integrity
 
@@ -237,7 +241,7 @@ most of QED's properties together with Mordred descriptors and ADMET-AI
 predictions, in models fitted to separate approved oral drugs from non-drug
 molecules. See the paper for how it compares with other drug-likeness scores.
 
-**Which molecules can it score?**
+**Which molecules can HADES score (salts, fragments, invalid SMILES)?**
 Whole molecules that RDKit can parse. The counter-ions on RDKit's default salt
 list (Na+, K+, Cl-, mesylate, tartrate and other common ones) are stripped and
 charges neutralized first, so those salt forms score as their parent molecule.
@@ -250,10 +254,14 @@ water. Scores mean most for drug-sized organic molecules like the ones in the
 training data; a low score for chemistry far outside it is not evidence that a
 molecule is not drug-like.
 
-**How fast is it?**
+**How fast is HADES?**
 After the models load, about 30 ms per molecule on a laptop CPU (an Intel Core 5
 120U: 200 compounds in 5.6 s, 2,000 in 60.4 s), so 10,000 molecules take about
 five minutes. Training is much slower; see [docs/training.md](docs/training.md).
+
+**Can I use HADES commercially?**
+Yes. HADES is released under the MIT license, which allows commercial use; see
+[LICENSE](LICENSE).
 
 ## Contributing
 
