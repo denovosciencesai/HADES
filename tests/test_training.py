@@ -1,7 +1,7 @@
 """End-to-end check that training produces a model HADES_score can load.
 
 Slow -- about 16 minutes even on the 20 bundled molecules, because feature
-selection has a large fixed cost (see "How long training takes" in the README).
+selection has a large fixed cost (see "How long training takes" in docs/training.md).
 It is excluded by default; run it with:
 
     pytest -m slow
@@ -9,10 +9,16 @@ It is excluded by default; run it with:
 
 import pytest
 
+from pathlib import Path
+
 # Before pandas: importing pandas first loads an older libstdc++ than RDKit needs.
 from HADES_CALCULATOR import HADES_score
 from train_your_HADES import HADESTrainer
 from parameters_test import custom_param_spaces
+
+# Repository-only sample input, resolved from this file so the suite does not
+# depend on the directory pytest was started in.
+TEST_CSV = str(Path(__file__).resolve().parent.parent / "data_to_test.csv")
 
 
 @pytest.fixture(scope="module")
@@ -31,13 +37,13 @@ def test_bad_input_leaves_no_output_folder(trainer_factory, tmp_path):
     """A typo in the column name must not leave a folder that blocks the retry."""
     out = tmp_path / "run"
     with pytest.raises(KeyError):
-        trainer_factory(out, label_col="nope").run("data_to_test.csv")
+        trainer_factory(out, label_col="nope").run(TEST_CSV)
     assert not out.exists()
 
 
 def test_existing_folder_needs_overwrite(trainer_factory, tmp_path):
     with pytest.raises(FileExistsError, match="--overwrite"):
-        trainer_factory(tmp_path).run("data_to_test.csv")
+        trainer_factory(tmp_path).run(TEST_CSV)
 
 
 def test_overwrite_removes_models_from_an_earlier_run(trainer_factory, tmp_path):
@@ -53,7 +59,7 @@ def test_overwrite_removes_models_from_an_earlier_run(trainer_factory, tmp_path)
 def test_trained_model_can_be_loaded_and_scores(tmp_path):
     out = HADESTrainer(output_dir=str(tmp_path / "run"), smiles_col="SMILES", label_col="phase",
                        positive_label=4, negative_label=0,
-                       param_spaces=custom_param_spaces()).run("data_to_test.csv")
+                       param_spaces=custom_param_spaces()).run(TEST_CSV)
 
     # A fresh run has no SHA256SUMS, so there is nothing to verify against.
     hades = HADES_score(models_dir=f"{out}/models", x_train_parquet=f"{out}/X_train.parquet",
