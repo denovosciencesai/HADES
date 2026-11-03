@@ -1,12 +1,12 @@
-![HADES drug-likeness score logo](hades_logo.svg)
+![HADES drug-likeness score logo](https://raw.githubusercontent.com/denovosciencesai/HADES/main/hades_logo.svg)
 
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
 [![Paper: J. Chem. Inf. Model. 2026](https://img.shields.io/badge/paper-J.%20Chem.%20Inf.%20Model.%202026-1f6feb)](https://doi.org/10.1021/acs.jcim.5c02953)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green)](LICENSE)
-[![Python 3.10](https://img.shields.io/badge/python-3.10-blue)](environment.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/denovosciencesai/HADES/blob/main/LICENSE)
+[![Python 3.10](https://img.shields.io/badge/python-3.10-blue)](https://github.com/denovosciencesai/HADES/blob/main/environment.yml)
 [![MCP server](https://img.shields.io/badge/MCP-server-8A2BE2)](#mcp-server-use-hades-from-claude-and-other-ai-assistants)
-[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](docs/mcp.md#claude-code-plugin)
+[![Claude Code plugin](https://img.shields.io/badge/Claude%20Code-plugin-D97757)](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md#claude-code-plugin)
 
 HADES (Holistic AI-based Drug-likeness Estimation Score) is an open-source Python
 package, command-line tool and MCP server that predicts the oral drug-likeness of
@@ -146,7 +146,7 @@ HADESTrainer(output_dir="my_model", smiles_col="SMILES", label_col="phase",
 Expect at least 15 minutes even on a few molecules: feature selection has a large
 fixed cost. The run writes its models, data splits and settings into `my_model/`,
 and refuses to overwrite an existing folder unless you pass `--overwrite`.
-[docs/training.md](docs/training.md) has the timings, the output layout,
+[docs/training.md](https://github.com/denovosciencesai/HADES/blob/main/docs/training.md) has the timings, the output layout,
 retraining with `--reuse-hpo` and custom hyperparameter searches.
 
 ### Score with a model you trained
@@ -191,7 +191,7 @@ claude mcp add --scope user hades -- /path/to/envs/hades/bin/python /path/to/HAD
 ```
 
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
-[docs/mcp.md](docs/mcp.md) covers installing from a shell or a local clone, Claude
+[docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md) covers installing from a shell or a local clone, Claude
 Desktop and other clients, Windows and WSL, the tool's output and its configuration.
 
 ## Model files and integrity
@@ -200,7 +200,7 @@ The pretrained models are Python pickles, and **unpickling a file executes code
 contained in it**: only load models from this repository or from a training run
 of your own. `HADES_score` checks the shipped models against
 `HADES/data/models/SHA256SUMS` before loading them, and refuses to load a file
-that does not match. [docs/model-integrity.md](docs/model-integrity.md) lists the
+that does not match. [docs/model-integrity.md](https://github.com/denovosciencesai/HADES/blob/main/docs/model-integrity.md) lists the
 checksums and the `verify=` options, and shows how to add a manifest to your own
 models.
 
@@ -261,18 +261,18 @@ molecule is not drug-like.
 **How fast is HADES?**
 After the models load, about 30 ms per molecule on a laptop CPU (an Intel Core 5
 120U: 200 compounds in 5.6 s, 2,000 in 60.4 s), so 10,000 molecules take about
-five minutes. Training is much slower; see [docs/training.md](docs/training.md).
+five minutes. Training is much slower; see [docs/training.md](https://github.com/denovosciencesai/HADES/blob/main/docs/training.md).
 
 **Can I use HADES commercially?**
 Yes. HADES is released under the MIT license, which allows commercial use; see
-[LICENSE](LICENSE).
+[LICENSE](https://github.com/denovosciencesai/HADES/blob/main/LICENSE).
 
 ## Contributing
 
-[CONTRIBUTING.md](CONTRIBUTING.md) covers setting up, the repository layout,
+[CONTRIBUTING.md](https://github.com/denovosciencesai/HADES/blob/main/CONTRIBUTING.md) covers setting up, the repository layout,
 running the tests and submitting changes. To report a security problem, follow
-[SECURITY.md](SECURITY.md).
+[SECURITY.md](https://github.com/denovosciencesai/HADES/blob/main/SECURITY.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/denovosciencesai/HADES/blob/main/LICENSE).
