@@ -10,4 +10,10 @@ dependencies:
                             # chemprop 1.6.1 declares no setuptools constraint,
                             # so nothing else enforces this.
   - pip:
+      # The CPU-only torch build. On Linux, PyPI's torch bundles several GB of
+      # CUDA libraries that HADES never uses; this index has the same version
+      # without them (2.5.1+cpu), and it scores the paper's 1,622 test-set
+      # molecules bit-for-bit like the CUDA build. On Windows PyPI's torch is
+      # already CPU-only; macOS has no build here and falls back to PyPI's.
+      - --extra-index-url https://download.pytorch.org/whl/cpu
       - -r requirements.txt

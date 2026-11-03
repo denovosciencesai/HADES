@@ -117,3 +117,17 @@ Bump the version in `pyproject.toml`, `HADES/__init__.py`, `CITATION.cff` and
 `.claude-plugin/plugin.json` together. Claude Code users get a new version of
 the plugin only when the version in `plugin.json` changes; until then,
 `claude plugin update` keeps them on the copy they have.
+
+The package is published to PyPI as `hades-druglikeness` by
+`.github/workflows/publish.yml`, through PyPI trusted publishing (no API token):
+
+1. Merge the version bump into `main`.
+2. Optional trial: Actions → publish → Run workflow uploads to TestPyPI. Check
+   it installs with
+   `pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ hades-druglikeness`.
+3. Create a GitHub release with tag `v<version>`, for example `v1.0.1`.
+   Publishing the release uploads to PyPI. The workflow stops if the tag does
+   not match the version in `pyproject.toml`.
+
+A version number can be uploaded to PyPI only once, even after it is deleted,
+so a mistake means a new version.

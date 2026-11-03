@@ -24,7 +24,9 @@ pip install "mcp==2.3.0"
 
 From a checkout, `pip install -e ".[mcp]"` does the same and also installs HADES
 itself, with a `hades-mcp` command; it re-applies every pin in `requirements.txt`
-too. The environment works on native Windows as well as Linux (macOS is
+too. Without a checkout, `pip install "hades-druglikeness[mcp]"` installs the
+same command from PyPI, and `uvx` can run it with no environment to manage (see
+[Without a clone](#without-a-clone)). The environment works on native Windows as well as Linux (macOS is
 untested). Install it on the system that runs your MCP client: a Windows client
 cannot use the plugin with an environment that lives in WSL (see
 [Other MCP clients](#other-mcp-clients)).
@@ -117,6 +119,53 @@ the server through WSL: `"command": "wsl.exe"` with
 The plugin cannot do this, so with Claude Code use `claude mcp add` the same way
 (`claude mcp add --scope user hades -- wsl.exe -d Ubuntu -e ...`), or run Claude
 Code inside WSL.
+
+### Without a clone
+
+[uv](https://docs.astral.sh/uv/)'s `uvx` installs HADES from PyPI into a cached
+environment of its own and runs the server from it. The first run downloads
+about 3 GB and can take 15 minutes or more, far longer than MCP clients wait for
+a server to start, so run it once in a terminal before registering it:
+
+```bash
+uvx --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp --selftest
+```
+
+It prints a score for ethanol (`0.0178  CCO`). Later runs reuse the cached
+environment and start in seconds.
+
+On Linux, PyPI's torch brings several GB of CUDA libraries that HADES does not
+use. PyTorch's CPU-only index avoids them, with identical scores. uv needs
+`--index-strategy unsafe-best-match` to pick each package from whichever index
+has the pinned version, as pip does; without it, uv looks for every package on
+the first index that lists it. Use the same options in the commands below:
+
+```bash
+uvx --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match \
+    --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp --selftest
+```
+
+Then register the same command, in Claude Code:
+
+```bash
+claude mcp add --scope user hades -- uvx --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp
+```
+
+or in `claude_desktop_config.json` and clients that use its format:
+
+```json
+{
+  "mcpServers": {
+    "hades": {
+      "command": "uvx",
+      "args": ["--python", "3.10", "--from", "hades-druglikeness[mcp]", "hades-mcp"]
+    }
+  }
+}
+```
+
+If the client cannot find `uvx`, give its full path (`which uvx`, or `where uvx`
+on Windows).
 
 ## What the tool returns
 

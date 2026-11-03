@@ -1,0 +1,88 @@
+name: publish
+
+# Builds the package and uploads it with PyPI trusted publishing, so no API
+# token is stored anywhere. Publishing a GitHub release uploads to PyPI; running
+# the workflow by hand (Actions -> publish -> Run workflow) uploads to TestPyPI,
+# for a trial before the real release. Both upload jobs use the `pypi`
+# environment, so a required reviewer set on it gates every upload.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Build the sdist and wheel
+        run: |
+          python -m pip install "build==1.6.1" "twine==6.2.0"
+          python -m build
+
+      - name: Check the README renders on PyPI
+        run: python -m twine check --strict dist/*
+
+      - name: Check the wheel before it is uploaded
+        # A version on PyPI can never be uploaded twice, so catch the two
+        # mistakes that would burn one: a release tag that does not match the
+        # package version, and a wheel without the models.
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'EOF'
+          import glob, os, zipfile
+          (wheel,) = glob.glob("dist/*.whl")
+          version = os.path.basename(wheel).split("-")[1]
+          tag = os.environ["TAG"]
+          if tag and tag.removeprefix("v") != version:
+              raise SystemExit(f"release tag {tag!r} does not match package version {version!r}")
+          names = zipfile.ZipFile(wheel).namelist()
+          models = [n for n in names if n.startswith("HADES/data/models/") and n.endswith(".pkl")]
+          if len(models) != 5 or "HADES/data/feature_spec.parquet" not in names:
+              raise SystemExit(f"wheel is missing model data: {models}")
+          print(f"{wheel}: version {version}, {len(models)} models")
+          EOF
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  testpypi:
+    if: github.event_name == 'workflow_dispatch'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          # TestPyPI refuses a re-upload too; skipping lets the trial run again.
+          skip-existing: true
+
+  pypi:
+    if: github.event_name == 'release'
+    needs: build
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      id-token: write  # trusted publishing
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1

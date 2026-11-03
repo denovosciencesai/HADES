@@ -3,12 +3,25 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "hades"
+# The PyPI distribution name; `hades` is taken there. Imports are unchanged:
+# `import HADES`, `from HADES_CALCULATOR import HADES_score`.
+name = "hades-druglikeness"
 version = "1.0.0"
 description = "Machine-learning oral drug-likeness score for small molecules from their SMILES"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
+# The paper's authors, as in CITATION.cff.
+authors = [
+    { name = "Narek Petrosyan" },
+    { name = "Hovhannes Matevosyan" },
+    { name = "Irina Tirosyan" },
+    { name = "Yeva Gabrielyan" },
+    { name = "Smbat Gevorgyan" },
+    { name = "Vardan Harutyunyan" },
+    { name = "Mher Matevosyan" },
+    { name = "Hovakim Zakaryan" },
+]
 # The pickled models and the pinned stack were built on Python 3.10 (see
 # environment.yml); nothing here has been validated on 3.11+.
 requires-python = ">=3.10,<3.11"
@@ -19,6 +32,7 @@ keywords = [
     "Mordred", "machine learning", "ensemble learning", "MCP", "Claude Code",
 ]
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3 :: Only",
     "Intended Audience :: Science/Research",
@@ -65,8 +79,9 @@ HADES = ["data/models/*.pkl", "data/models/SHA256SUMS", "data/feature_spec.parqu
 
 [tool.setuptools.dynamic]
 # Single source of truth for pins -- a second list here would drift from the
-# one environment.yml installs. rdkit is deliberately absent: it comes from
-# conda-forge, so `pip install .` alone does not produce a working install.
+# one environment.yml installs. rdkit is listed too, so a pip-only install
+# works; in the conda environment, conda-forge installs the same version first
+# and pip counts it as already satisfied.
 dependencies = {file = ["requirements.txt"]}
 
 [tool.ruff.lint]
