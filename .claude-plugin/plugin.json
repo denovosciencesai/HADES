@@ -1,7 +1,7 @@
 {
   "name": "hades",
   "displayName": "HADES drug-likeness score",
-  "version": "1.0.0",
+  "version": "0.9.0",
   "description": "Score the oral drug-likeness of small molecules from SMILES with HADES (Holistic AI-based Drug-likeness Estimation Score), a soft-voting ensemble over Mordred, ADMET-AI and QED descriptors, served as a local MCP tool.",
   "author": {
     "name": "Denovo Sciences",
