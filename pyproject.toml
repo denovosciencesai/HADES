@@ -11,6 +11,17 @@ description = "Machine-learning oral drug-likeness score for small molecules fro
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
+# The paper's authors, as in CITATION.cff.
+authors = [
+    { name = "Narek Petrosyan" },
+    { name = "Hovhannes Matevosyan" },
+    { name = "Irina Tirosyan" },
+    { name = "Yeva Gabrielyan" },
+    { name = "Smbat Gevorgyan" },
+    { name = "Vardan Harutyunyan" },
+    { name = "Mher Matevosyan" },
+    { name = "Hovakim Zakaryan" },
+]
 # The pickled models and the pinned stack were built on Python 3.10 (see
 # environment.yml); nothing here has been validated on 3.11+.
 requires-python = ">=3.10,<3.11"
@@ -21,6 +32,7 @@ keywords = [
     "Mordred", "machine learning", "ensemble learning", "MCP", "Claude Code",
 ]
 classifiers = [
+    "Development Status :: 5 - Production/Stable",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3 :: Only",
     "Intended Audience :: Science/Research",

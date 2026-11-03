@@ -37,6 +37,10 @@ It ships the paper's pretrained models and lets you:
 
 ## Quick start
 
+To score molecules without cloning, `pip install hades-druglikeness` and use the
+Python example below ([Installation](#with-pip) has the details). To run the
+scripts on the example data:
+
 ```bash
 git clone https://github.com/denovosciencesai/HADES.git
 cd HADES
@@ -70,9 +74,34 @@ and test sets in `train_test_saved/`.
 
 ## Installation
 
-HADES needs Python 3.10 and is easiest to install with conda (Miniconda or
-Anaconda), because RDKit and other compiled dependencies install most reliably
-from conda-forge:
+HADES needs Python 3.10. It runs on Linux and Windows; macOS is untested.
+
+### With pip
+
+HADES is on PyPI as `hades-druglikeness`. In a Python 3.10 environment:
+
+```bash
+pip install hades-druglikeness
+```
+
+On Linux, add PyTorch's CPU-only index, or pip downloads several GB of CUDA
+libraries that HADES does not use; the scores are identical either way:
+
+```bash
+pip install --extra-index-url https://download.pytorch.org/whl/cpu hades-druglikeness
+```
+
+The trained models are installed with the code. `from HADES import HADES_score, HADESTrainer`
+works from any directory, as do the commands `hades-score` and `hades-train`
+(the same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`).
+For the [MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants),
+install `"hades-druglikeness[mcp]"` instead, which adds the `hades-mcp` command.
+
+### With conda, from a clone
+
+To run the scripts and example data in this repository, or to reproduce the
+paper, use the conda environment. RDKit and other compiled dependencies install
+most reliably from conda-forge:
 
 ```bash
 conda env create -f environment.yml
@@ -189,6 +218,21 @@ the same two paths:
 ```bash
 claude mcp add --scope user hades -- /path/to/envs/hades/bin/python /path/to/HADES/hades_mcp.py
 ```
+
+Without a clone or a conda environment, [uv](https://docs.astral.sh/uv/) can
+install HADES from PyPI and run the server. Run it once in a terminal first: the
+first run downloads about 3 GB and can take 15 minutes or more, far longer than an
+MCP client waits for a server to start. Then register it:
+
+```bash
+uvx --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp --selftest
+claude mcp add --scope user hades -- uvx --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp
+```
+
+On Linux, add `--extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match`
+after `uvx` in both commands, to get the CPU-only torch; without it, the first run
+pulls CUDA libraries HADES does not use and needs about 6.5 GB. See
+[docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md#without-a-clone).
 
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md) covers installing from a shell or a local clone, Claude
