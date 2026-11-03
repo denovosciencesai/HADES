@@ -1,0 +1,118 @@
+name: install-check
+
+# Installs a published HADES the way a user would, on Linux, Windows and an
+# Apple Silicon Mac, and checks that it scores. Run it by hand (Actions ->
+# install-check -> Run workflow) after the TestPyPI trial and again after a
+# release. Nothing here uses the repository checkout: it tests the uploaded
+# package, not the source.
+
+on:
+  workflow_dispatch:
+    inputs:
+      index:
+        description: "Where to install from"
+        type: choice
+        options: [testpypi, pypi]
+        default: testpypi
+      version:
+        description: "Version to install"
+        default: "1.0.0"
+  pull_request:
+    paths: [".github/workflows/install-check.yml"]
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        # macos-14 is Apple Silicon. Intel Macs are not covered: torch 2.5.1,
+        # which HADES pins, has no x86_64 macOS build.
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      INDEX: ${{ inputs.index || 'testpypi' }}
+      VERSION: ${{ inputs.version || '1.0.0' }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install hades-druglikeness[mcp]
+        run: |
+          cd "$RUNNER_TEMP"
+          # On Linux, the CPU-only torch index, as README.md recommends.
+          if [ "$RUNNER_OS" = Linux ]; then
+            extra="--extra-index-url https://download.pytorch.org/whl/cpu"
+          fi
+          if [ "$INDEX" = testpypi ]; then
+            # Only HADES from TestPyPI, where anyone can upload a look-alike of
+            # any dependency; everything else from PyPI.
+            pip download --no-deps -i https://test.pypi.org/simple/ "hades-druglikeness==$VERSION" -d dl
+            pip install $extra "$(ls dl/*.whl)[mcp]"
+          else
+            pip install $extra "hades-druglikeness[mcp]==$VERSION"
+          fi
+          pip show hades-druglikeness | grep -E "^(Name|Version):"
+          python -c "import torch; print('torch', torch.__version__)"
+          cat > check.py <<'EOF'
+          import HADES
+          from HADES_CALCULATOR import HADES_score
+          score = HADES_score().score("CCO")
+          print(f"CCO {score:.6f}  (HADES from {HADES.__file__})")
+          assert abs(score - 0.017846526) < 1e-4, score
+          EOF
+
+      - name: Score a molecule
+        id: score
+        # On macOS, LightGBM and XGBoost may need the OpenMP runtime; a failure
+        # here is retried below with it, so the run shows which case applies.
+        continue-on-error: ${{ runner.os == 'macOS' }}
+        run: cd "$RUNNER_TEMP" && python check.py
+
+      - name: Retry with libomp (macOS)
+        if: steps.score.outcome == 'failure'
+        run: |
+          echo "::warning::HADES on macOS needed 'brew install libomp'; document it in README.md"
+          brew install libomp
+          cd "$RUNNER_TEMP" && python check.py
+
+      - name: Run the commands
+        run: |
+          cd "$RUNNER_TEMP"
+          printf 'SMILES\nCCO\nCC(=O)Oc1ccccc1C(=O)O\n' > in.csv
+          hades-score -i in.csv -o out.csv
+          cat out.csv
+          hades-mcp --selftest CCO NOT_A_SMILES
+
+      - name: Call the tool over MCP
+        # --selftest scores in-process; this starts `hades-mcp` as an MCP
+        # client would and calls hades_score over the stdio protocol.
+        run: |
+          cd "$RUNNER_TEMP"
+          python - <<'EOF'
+          import json, shutil, sys
+          import anyio
+          from mcp import ClientSession, StdioServerParameters
+          from mcp.client.stdio import stdio_client
+
+          params = StdioServerParameters(command=shutil.which("hades-mcp"), args=[])
+
+          async def main():
+              with anyio.fail_after(600):
+                  async with stdio_client(params, errlog=sys.__stderr__) as (read, write):
+                      async with ClientSession(read, write) as session:
+                          await session.initialize()
+                          tools = [t.name for t in (await session.list_tools()).tools]
+                          assert tools == ["hades_score"], tools
+                          result = await session.call_tool("hades_score", {"smiles": ["CCO", "NOT_A_SMILES"]})
+                          assert not result.is_error, result.content
+                          return result.structured_content or json.loads(result.content[0].text)
+
+          out = anyio.run(main)
+          print(json.dumps(out))
+          assert abs(out["results"][0]["hades_score"] - 0.0178) < 1e-3, out
+          assert out["invalid"][0]["smiles"] == "NOT_A_SMILES", out
+          EOF

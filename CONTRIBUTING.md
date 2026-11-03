@@ -124,7 +124,10 @@ The package is published to PyPI as `hades-druglikeness` by
 1. Merge the version bump into `main`.
 2. Optional trial: Actions → publish → Run workflow uploads to TestPyPI. Check
    it installs with
-   `pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ hades-druglikeness`.
+   `pip install -i https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ hades-druglikeness`,
+   or run Actions → install-check (index `testpypi`), which installs it on
+   Linux, Windows and an Apple Silicon Mac, scores a molecule and calls the
+   MCP tool. Run it again with index `pypi` after the release.
 3. Create a GitHub release with tag `v<version>`, for example `v1.0.1`.
    Publishing the release uploads to PyPI. The workflow stops if the tag does
    not match the version in `pyproject.toml`.
