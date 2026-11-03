@@ -1,7 +1,7 @@
 """End-to-end check that training produces a model HADES_score can load.
 
 Slow -- about 16 minutes even on the 20 bundled molecules, because feature
-selection has a large fixed cost (see "How long training takes" in the README).
+selection has a large fixed cost (see "How long training takes" in docs/training.md).
 It is excluded by default; run it with:
 
     pytest -m slow

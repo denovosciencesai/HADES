@@ -8,18 +8,22 @@ message: "If you use HADES, please cite the article under preferred-citation."
 type: software
 version: 1.0.0
 license: MIT
-repository-code: "https://github.com/denovosciencesai/HADES-Internal"
+repository-code: "https://github.com/denovosciencesai/HADES"
 keywords:
   - drug-likeness
+  - oral drug-likeness
   - ADMET
   - cheminformatics
+  - drug discovery
   - machine learning
   - virtual screening
   - SMILES
+  - Model Context Protocol
 authors:
   - given-names: Narek
     family-names: Petrosyan
     affiliation: "Denovo Sciences Inc."
+    orcid: "https://orcid.org/0009-0004-4714-8835"
   - given-names: Hovhannes
     family-names: Matevosyan
     affiliation: "Denovo Sciences Inc."

@@ -15,6 +15,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Free disk space
+        # On Linux the pinned torch pulls in several GB of CUDA wheels, more
+        # than the runner has free: the environment step failed with "No space
+        # left on device". Drop preinstalled toolchains HADES never uses.
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
       - uses: mamba-org/setup-micromamba@v2
         with:
           environment-file: environment.yml
@@ -28,11 +36,12 @@ jobs:
       - name: Verify model checksums
         run: cd HADES/data/models && sha256sum -c SHA256SUMS
 
-      - name: Install HADES and its dev tooling
+      - name: Install HADES, its dev tooling and the MCP SDK
         # The runtime pins are already in the environment; this adds pytest and
         # ruff from the [dev] extra, so CI installs what CONTRIBUTING.md tells a
-        # contributor to install rather than its own list.
-        run: pip install -e ".[dev]"
+        # contributor to install rather than its own list. The [mcp] extra lets
+        # tests/test_mcp.py run instead of skipping, at about two minutes a run.
+        run: pip install -e ".[dev,mcp]"
 
       - name: Run tests
         # Fast checks only; `-m slow` trains a model end to end (~16 minutes).

@@ -1,0 +1,40 @@
+{
+  "name": "hades",
+  "displayName": "HADES drug-likeness score",
+  "version": "1.0.0",
+  "description": "Score the oral drug-likeness of small molecules from SMILES with HADES (Holistic AI-based Drug-likeness Estimation Score), a soft-voting ensemble over Mordred, ADMET-AI and QED descriptors, served as a local MCP tool.",
+  "author": {
+    "name": "Denovo Sciences",
+    "url": "https://denovosciences.ai"
+  },
+  "homepage": "https://github.com/denovosciencesai/HADES",
+  "repository": "https://github.com/denovosciencesai/HADES",
+  "license": "MIT",
+  "keywords": [
+    "drug-likeness",
+    "drug-discovery",
+    "cheminformatics",
+    "medicinal-chemistry",
+    "smiles",
+    "rdkit",
+    "admet",
+    "qed",
+    "mordred",
+    "mcp"
+  ],
+  "userConfig": {
+    "python": {
+      "type": "file",
+      "title": "Python interpreter of the hades conda environment",
+      "description": "Absolute path to python in the conda environment built from environment.yml, with the MCP SDK added (see the HADES README). Write it out in full; ~ is not expanded. For example /home/you/miniconda3/envs/hades/bin/python or C:/Users/you/miniconda3/envs/hades/python.exe. Print it with: conda run -n hades python -c \"import sys; print(sys.executable)\"",
+      "required": true
+    }
+  },
+  "mcpServers": {
+    "hades": {
+      "type": "stdio",
+      "command": "${user_config.python}",
+      "args": ["-B", "-s", "${CLAUDE_PLUGIN_ROOT}/hades_mcp.py"]
+    }
+  }
+}

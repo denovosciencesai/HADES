@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "hades"
 version = "1.0.0"
-description = "Soft-voting ensemble that scores small molecules from their SMILES"
+description = "Machine-learning oral drug-likeness score for small molecules from their SMILES"
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
@@ -13,13 +13,25 @@ license-files = ["LICENSE"]
 # environment.yml); nothing here has been validated on 3.11+.
 requires-python = ">=3.10,<3.11"
 dynamic = ["dependencies"]
+keywords = [
+    "drug-likeness", "oral drug-likeness", "cheminformatics", "drug discovery",
+    "medicinal chemistry", "virtual screening", "ADMET", "QED", "SMILES", "RDKit",
+    "Mordred", "machine learning", "ensemble learning", "MCP", "Claude Code",
+]
 classifiers = [
     "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3 :: Only",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Chemistry",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
 ]
 
 [project.urls]
+Homepage = "https://github.com/denovosciencesai/HADES"
+Documentation = "https://github.com/denovosciencesai/HADES#readme"
+Issues = "https://github.com/denovosciencesai/HADES/issues"
 Paper = "https://doi.org/10.1021/acs.jcim.5c02953"
 
 [project.optional-dependencies]
@@ -27,17 +39,22 @@ Paper = "https://doi.org/10.1021/acs.jcim.5c02953"
 # else: an unpinned ruff turns the build red on its own release schedule, with
 # no change to this repository.
 dev = ["pytest==9.1.1", "ruff==0.17.1"]
+# The MCP server, hades_mcp.py, for Claude Code, Claude Desktop and other MCP
+# clients. Scoring and training do not need it. README.md and docs/mcp.md give
+# the same pin for a bare `pip install`; change them together.
+mcp = ["mcp==2.3.0"]
 
 [project.scripts]
 hades-score = "HADES_CALCULATOR:main"
 hades-train = "train_your_HADES:main"
+hades-mcp = "hades_mcp:main"
 
 [tool.setuptools]
 # Flat layout: the package sits at the repo root under its own name, and the
-# two entry-point scripts stay beside it as top-level modules so the published
+# entry-point scripts stay beside it as top-level modules so the published
 # `from HADES_CALCULATOR import HADES_score` keeps working once installed.
 packages = ["HADES"]
-py-modules = ["HADES_CALCULATOR", "train_your_HADES"]
+py-modules = ["HADES_CALCULATOR", "train_your_HADES", "hades_mcp"]
 
 [tool.setuptools.package-data]
 # The trained ensemble and the descriptor spec travel inside the package, so an

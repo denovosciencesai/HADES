@@ -8,7 +8,7 @@ should be reported privately rather than in a public issue.
 
 Report privately through GitHub:
 **Security → Report a vulnerability** on this repository
-(<https://github.com/denovosciencesai/HADES-Internal/security/advisories/new>).
+(<https://github.com/denovosciencesai/HADES/security/advisories/new>).
 
 If you cannot use GitHub, email **<narekp@denovosciences.ai>**.
 
@@ -33,7 +33,7 @@ Only the latest release receives security fixes.
 ## What is not in scope
 
 - Loading a model directory that you obtained from a source you do not trust.
-  As the README explains, a checksum only proves the bytes match the manifest.
+  As docs/model-integrity.md explains, a checksum only proves the bytes match the manifest.
   If the manifest came from the same untrusted source, it proves nothing, and
   the pickle runs on load either way.
 - Running with `verify="off"`.
