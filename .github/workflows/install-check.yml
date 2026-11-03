@@ -55,7 +55,7 @@ jobs:
           else
             pip install $extra "hades-druglikeness[mcp]==$VERSION"
           fi
-          pip show hades-druglikeness | head -2
+          pip show hades-druglikeness | grep -E "^(Name|Version):"
           python -c "import torch; print('torch', torch.__version__)"
           cat > check.py <<'EOF'
           import HADES
