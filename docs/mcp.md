@@ -6,16 +6,26 @@ set of analogues by HADES score and it calls HADES directly. The server exposes 
 tool, `hades_score`, which takes a list of SMILES and returns a score for each
 molecule, plus a reason for every input it could not score.
 
-**Contents:** [Install the MCP SDK](#install-the-mcp-sdk) ·
+**Contents:** [Install](#install) ·
 [Claude Code plugin](#claude-code-plugin) ·
 [Other MCP clients](#other-mcp-clients) ·
 [What the tool returns](#what-the-tool-returns) ·
 [Configuration](#configuration)
 
-## Install the MCP SDK
+## Install
 
-The server runs on your machine, in the `hades` environment
-([Installation](../README.md#installation)), which needs the MCP SDK added once:
+The server runs on your machine, from a Python 3.10 environment that has HADES
+and the MCP SDK. The simplest is HADES from PyPI with the `mcp` extra, which
+also adds a `hades-mcp` command (on Linux, add the CPU-only torch index from
+[Installation](../README.md#with-pip)):
+
+```bash
+pip install "hades-druglikeness[mcp]"
+```
+
+To run the server without managing an environment at all, see
+[Without a clone](#without-a-clone). In the conda environment of a clone
+([Installation](../README.md#with-conda-from-a-clone)), add the MCP SDK instead:
 
 ```bash
 conda activate hades
@@ -23,12 +33,9 @@ pip install "mcp==2.3.0"
 ```
 
 From a checkout, `pip install -e ".[mcp]"` does the same and also installs HADES
-itself, with a `hades-mcp` command; it re-applies every pin in `requirements.txt`
-too. Without a checkout, `pip install "hades-druglikeness[mcp]"` installs the
-same command from PyPI, and `uvx` can run it with no environment to manage (see
-[Without a clone](#without-a-clone)). The environment works on native Windows as well as Linux (macOS is
-untested). Install it on the system that runs your MCP client: a Windows client
-cannot use the plugin with an environment that lives in WSL (see
+itself, with the `hades-mcp` command; it re-applies every pin in
+`requirements.txt` too. Install it on the system that runs your MCP client: a
+Windows client cannot use the plugin with an environment that lives in WSL (see
 [Other MCP clients](#other-mcp-clients)).
 
 ## Claude Code plugin
@@ -45,11 +52,12 @@ then install the plugin from it:
 To install from a local clone instead of GitHub, add the marketplace by path:
 `/plugin marketplace add /path/to/HADES`.
 
-The plugin asks for one setting: the absolute path of the `hades` environment's
-Python interpreter. To print it:
+The plugin asks for one setting: the absolute path of the Python interpreter of
+the environment from [Install](#install). To print it, run this inside that
+environment:
 
 ```bash
-conda run -n hades python -c "import sys; print(sys.executable)"
+python -c "import sys; print(sys.executable)"
 ```
 
 From a shell, the same install is:
@@ -86,15 +94,24 @@ new server process picks up the change.
 
 ## Other MCP clients
 
-Every MCP client needs the same two things: the `hades` environment's Python and
-the path to `hades_mcp.py`. In Claude Code without the plugin:
+Every MCP client needs one command that starts the server. With HADES installed
+from PyPI, that is the full path of `hades-mcp` (`which hades-mcp`, or
+`where hades-mcp` on Windows). In Claude Code without the plugin:
 
 ```bash
-claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /path/to/HADES/hades_mcp.py
+claude mcp add --scope user hades -- "$(which hades-mcp)"
 ```
 
 `--scope user` makes the tool available in every project, as the plugin does;
-without it, it exists only in the directory where you ran the command.
+without it, it exists only in the directory where you ran the command. In other
+clients, use the same path as the command, with no arguments.
+
+From a clone, the command is the `hades` environment's Python, with the path
+to `hades_mcp.py` as its argument:
+
+```bash
+claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /home/you/HADES/hades_mcp.py
+```
 
 In Claude Desktop (`claude_desktop_config.json`), and in clients that use the
 same format:

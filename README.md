@@ -2,6 +2,7 @@
 
 # HADES — Holistic AI-based Drug-likeness Estimation Score
 
+[![PyPI](https://img.shields.io/pypi/v/hades-druglikeness)](https://pypi.org/project/hades-druglikeness/)
 [![Paper: J. Chem. Inf. Model. 2026](https://img.shields.io/badge/paper-J.%20Chem.%20Inf.%20Model.%202026-1f6feb)](https://doi.org/10.1021/acs.jcim.5c02953)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/denovosciencesai/HADES/blob/main/LICENSE)
 [![Python 3.10](https://img.shields.io/badge/python-3.10-blue)](https://github.com/denovosciencesai/HADES/blob/main/environment.yml)
@@ -37,19 +38,12 @@ It ships the paper's pretrained models and lets you:
 
 ## Quick start
 
-To score molecules without cloning, `pip install hades-druglikeness` and use the
-Python example below ([Installation](#with-pip) has the details). To run the
-scripts on the example data:
+In a Python 3.10 environment (on Linux, add the CPU-only torch index from
+[Installation](#with-pip) to save several GB):
 
 ```bash
-git clone https://github.com/denovosciencesai/HADES.git
-cd HADES
-conda env create -f environment.yml
-conda activate hades
-python HADES_CALCULATOR.py -i data_to_test.csv -o scores.csv
+pip install hades-druglikeness
 ```
-
-`scores.csv` is `data_to_test.csv` with a `HADES_Score` column added. From Python:
 
 ```python
 from HADES_CALCULATOR import HADES_score
@@ -57,6 +51,18 @@ from HADES_CALCULATOR import HADES_score
 hades = HADES_score()
 hades.score("CCO")                # 0.0178...
 hades.score(["CCO", "c1ccccc1"])  # DataFrame with SMILES and HADES_Score columns
+```
+
+The first call is slow while the models load. To score a CSV, run
+`hades-score -i molecules.csv -o scores.csv`, which adds a `HADES_Score` column.
+To run the scripts on this repository's example data instead:
+
+```bash
+git clone https://github.com/denovosciencesai/HADES.git
+cd HADES
+conda env create -f environment.yml
+conda activate hades
+python HADES_CALCULATOR.py -i data_to_test.csv -o scores.csv
 ```
 
 ### How it works
@@ -74,7 +80,9 @@ and test sets in `train_test_saved/`.
 
 ## Installation
 
-HADES needs Python 3.10. It runs on Linux and Windows; macOS is untested.
+HADES needs Python 3.10. It runs on Linux, Windows and Apple Silicon Macs, with
+the same scores on all three. Intel Macs are not supported: torch 2.5.1, which
+HADES pins, has no build for them.
 
 ### With pip
 
@@ -196,33 +204,22 @@ custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_mod
 [Model Context Protocol](https://modelcontextprotocol.io), so Claude and other AI assistants can score molecules while they work. It exposes
 one tool, `hades_score`, which takes a list of SMILES and returns a score for each,
 plus a reason for every input it could not score. Scoring runs on your machine.
+Pick one of the ways below; each ends with the server registered in Claude Code.
 
-Add the MCP SDK to the `hades` environment once:
-
-```bash
-conda activate hades
-pip install "mcp==2.3.0"
-```
-
-Then install the Claude Code plugin, which asks for the path of the environment's
-Python (`conda run -n hades python -c "import sys; print(sys.executable)"`):
-
-```
-/plugin marketplace add denovosciencesai/HADES
-/plugin install hades@denovo-hades
-```
-
-Or register the server with Claude Code directly, or with any other MCP client by
-the same two paths:
+**With pip.** Install HADES with the `mcp` extra, then register its `hades-mcp`
+command by its full path:
 
 ```bash
-claude mcp add --scope user hades -- /path/to/envs/hades/bin/python /path/to/HADES/hades_mcp.py
+pip install "hades-druglikeness[mcp]"
+claude mcp add --scope user hades -- "$(which hades-mcp)"
 ```
 
-Without a clone or a conda environment, [uv](https://docs.astral.sh/uv/) can
-install HADES from PyPI and run the server. Run it once in a terminal first: the
-first run downloads about 3 GB and can take 15 minutes or more, far longer than an
-MCP client waits for a server to start. Then register it:
+On Windows, give the path that `where hades-mcp` prints instead of `$(which hades-mcp)`.
+
+**With uvx, no environment to manage.** [uv](https://docs.astral.sh/uv/) installs
+HADES from PyPI into a cached environment and runs the server from it. Run it once
+in a terminal first: the first run downloads about 3 GB and can take 15 minutes
+or more, far longer than an MCP client waits for a server to start. Then register it:
 
 ```bash
 uvx --python 3.10 --from "hades-druglikeness[mcp]" hades-mcp --selftest
@@ -233,6 +230,26 @@ On Linux, add `--extra-index-url https://download.pytorch.org/whl/cpu --index-st
 after `uvx` in both commands, to get the CPU-only torch; without it, the first run
 pulls CUDA libraries HADES does not use and needs about 6.5 GB. See
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md#without-a-clone).
+
+**With the Claude Code plugin.** The plugin runs the server with a Python you
+point it to: any environment where HADES's dependencies and the MCP SDK are
+installed, such as the one from **With pip** above. It asks for that Python's
+full path, which `python -c "import sys; print(sys.executable)"` prints from
+inside the environment:
+
+```
+/plugin marketplace add denovosciencesai/HADES
+/plugin install hades@denovo-hades
+```
+
+**From a clone.** In the [conda environment](#with-conda-from-a-clone), add the
+MCP SDK, then register the clone's `hades_mcp.py` with that environment's Python
+(replace both paths with your own):
+
+```bash
+pip install "mcp==2.3.0"
+claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /home/you/HADES/hades_mcp.py
+```
 
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md) covers installing from a shell or a local clone, Claude
