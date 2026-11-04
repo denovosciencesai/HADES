@@ -116,3 +116,41 @@ jobs:
           assert abs(out["results"][0]["hades_score"] - 0.0178) < 1e-3, out
           assert out["invalid"][0]["smiles"] == "NOT_A_SMILES", out
           EOF
+
+  uvx:
+    # The route .claude-plugin/plugin.json runs, and the one README.md gives
+    # for Claude. The pip job above installs into a prepared Python 3.10; this
+    # one starts from nothing, lets uv fetch its own interpreter and resolve
+    # the whole stack from scratch -- which is where a dependency that is
+    # pinned only in environment.yml, and so missing from the wheel's
+    # metadata, shows up first.
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-14]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      INDEX: ${{ inputs.index || 'testpypi' }}
+      VERSION: ${{ inputs.version || '1.0.0' }}
+      # Each package from whichever index has the pinned version, as pip does;
+      # without it uv takes every package from the first index that lists one.
+      UV_INDEX_STRATEGY: unsafe-best-match
+    steps:
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Score through uvx, as the plugin runs it
+        run: |
+          cd "$RUNNER_TEMP"
+          # The CPU-only torch index, as plugin.json and README.md set it.
+          # Windows torch is already CPU-only and the index has no macOS build,
+          # so resolution falls through to PyPI on both.
+          export UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu
+          if [ "$INDEX" = testpypi ]; then
+            # HADES from TestPyPI, every dependency from PyPI, as above.
+            export UV_EXTRA_INDEX_URL="$UV_EXTRA_INDEX_URL https://test.pypi.org/simple/"
+          fi
+          uvx --python 3.10 --from "hades-druglikeness[mcp]==$VERSION" \
+              hades-mcp --selftest CCO NOT_A_SMILES
