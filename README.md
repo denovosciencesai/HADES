@@ -38,6 +38,9 @@ It ships the paper's pretrained models and lets you:
 
 ## Quick start
 
+Installing HADES downloads about 3 GB and takes 10–20 minutes the first time.
+After that, scoring is about 30 ms per molecule, once the models have loaded.
+
 In a Python 3.10 environment (on Linux, add the CPU-only torch index from
 [Installation](#with-pip) to save several GB):
 
@@ -48,22 +51,16 @@ pip install hades-druglikeness
 ```python
 from HADES_CALCULATOR import HADES_score
 
-hades = HADES_score()
+hades = HADES_score()             # loads the models; ~30 s, once per process
 hades.score("CCO")                # 0.0178...
 hades.score(["CCO", "c1ccccc1"])  # DataFrame with SMILES and HADES_Score columns
 ```
 
-The first call is slow while the models load. To score a CSV, run
-`hades-score -i molecules.csv -o scores.csv`, which adds a `HADES_Score` column.
-To run the scripts on this repository's example data instead:
-
-```bash
-git clone https://github.com/denovosciencesai/HADES.git
-cd HADES
-conda env create -f environment.yml
-conda activate hades
-python HADES_CALCULATOR.py -i data_to_test.csv -o scores.csv
-```
+To score a CSV, run `hades-score -i molecules.csv -o scores.csv`, which adds a
+`HADES_Score` column. To use HADES from Claude, see
+[MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants); to run
+the scripts on this repository's example data, or to train, see
+[With conda, from a clone](#with-conda-from-a-clone).
 
 ### How it works
 
@@ -107,9 +104,12 @@ install `"hades-druglikeness[mcp]"` instead, which adds the `hades-mcp` command.
 
 ### With conda, from a clone
 
-To run the scripts and example data in this repository, or to reproduce the
-paper, use the conda environment. RDKit and other compiled dependencies install
-most reliably from conda-forge:
+The conda environment is the contributor and reproduction path: it is what CI
+builds, what [CONTRIBUTING.md](CONTRIBUTING.md) sets up, and the environment to
+train in. Scoring does not need it — the models ship inside the package, so
+[With pip](#with-pip) above is enough. Use conda to run the scripts and example
+data in this repository, or to reproduce the paper; RDKit and the other compiled
+dependencies install most reliably from conda-forge:
 
 ```bash
 conda env create -f environment.yml
@@ -123,12 +123,8 @@ Optionally, install the project into the environment as well:
 pip install -e .
 ```
 
-That makes `from HADES import HADES_score, HADESTrainer` (the same classes as
-`HADES_CALCULATOR` and `train_your_HADES`) importable from any directory and adds the commands `hades-score` and `hades-train`, which take the
-same options as `python HADES_CALCULATOR.py` and `python train_your_HADES.py`, and
-`hades-mcp`, the [MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants), which also needs the
-`[mcp]` extra. The trained models and the descriptor spec are installed alongside
-the code, so all three work from any directory.
+That adds the same imports and commands as [With pip](#with-pip), built from the
+clone's source rather than from PyPI.
 
 **Using HADES from Claude or another AI assistant?** After this, follow
 [MCP server](#mcp-server-use-hades-from-claude-and-other-ai-assistants) to add
@@ -227,20 +223,49 @@ claude mcp add --scope user hades -- uvx --python 3.10 --from "hades-druglikenes
 ```
 
 On Linux, add `--extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match`
-after `uvx` in both commands, to get the CPU-only torch; without it, the first run
-pulls CUDA libraries HADES does not use and needs about 6.5 GB. See
+after `uvx` in **both** commands, to get the CPU-only torch; without it, the first run
+pulls CUDA libraries HADES does not use and needs about 6.5 GB. Both, because uv
+caches one environment per resolution: the index settings are part of that
+resolution, so a warm-up that carries them and a registered server that does not
+(or the reverse) use different environments. The warm-up then fills one and
+leaves the server installing from scratch on first start, which is the wait it
+was run to avoid. See
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md#without-a-clone).
 
-**With the Claude Code plugin.** The plugin runs the server with a Python you
-point it to: any environment where HADES's dependencies and the MCP SDK are
-installed, such as the one from **With pip** above. It asks for that Python's
-full path, which `python -c "import sys; print(sys.executable)"` prints from
-inside the environment:
+**With the Claude Code plugin, nothing to configure.** The simplest route. The
+plugin runs the same `uvx` command as above, so it needs [uv](https://docs.astral.sh/uv/)
+on your `PATH` and nothing else: no conda environment, no interpreter path. It
+passes the CPU-only torch index itself, on every platform.
+
+Run the warm-up once in a terminal first — the plugin cannot wait 15 minutes for
+a first install any more than `claude mcp add` can. uv caches an environment per
+resolution, so run **exactly** the command the plugin runs, pin and index
+settings included; a warm-up that differs in any of them fills a different cache
+entry and leaves the plugin to install from scratch anyway:
+
+```bash
+UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu \
+UV_INDEX_STRATEGY=unsafe-best-match \
+uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.0" hades-mcp --selftest
+```
+
+In PowerShell:
+
+```powershell
+$env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cpu"
+$env:UV_INDEX_STRATEGY = "unsafe-best-match"
+uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.0" hades-mcp --selftest
+```
+
+It prints a score for ethanol (`0.0178  CCO`). Then:
 
 ```
 /plugin marketplace add denovosciencesai/HADES
 /plugin install hades@denovo-hades
 ```
+
+The version in that command is the one the plugin pins; it matches the plugin
+release, not necessarily the newest HADES on PyPI.
 
 **From a clone.** In the [conda environment](#with-conda-from-a-clone), add the
 MCP SDK, then register the clone's `hades_mcp.py` with that environment's Python

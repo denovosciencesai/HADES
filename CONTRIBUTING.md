@@ -6,6 +6,11 @@ opening an issue.
 
 ## Setting up
 
+The conda environment is the contributor path. Users do not need it: the models
+ship inside the package, so scoring installs with `pip`, and the MCP server runs
+through `uvx`. Keep it that way — if a change makes conda necessary to *score*,
+it belongs behind a flag or a different design.
+
 ```bash
 conda env create -f environment.yml
 conda activate hades
@@ -117,6 +122,21 @@ Bump the version in `pyproject.toml`, `HADES/__init__.py`, `CITATION.cff` and
 `.claude-plugin/plugin.json` together. Claude Code users get a new version of
 the plugin only when the version in `plugin.json` changes; until then,
 `claude plugin update` keeps them on the copy they have.
+
+`plugin.json` carries the version **twice**: its own `version`, and the
+`hades-druglikeness[mcp]==<version>` pin in the `uvx` arguments that decides
+which release the plugin actually runs. Bump both, and merge the bump to `main`
+only once that version is on PyPI — a plugin pinned to a version PyPI does not
+have yet fails to start, with a uv resolution error rather than anything about
+HADES.
+
+The same pin appears a third time, in the plugin's warm-up command in
+`README.md`. It has to: uv caches one environment per resolution, so a warm-up
+whose pin, extra index or index strategy differs from the plugin's fills a
+different cache entry and leaves the plugin installing from scratch on first
+start — the 15-minute hang the warm-up exists to prevent. If you change the
+`uvx` arguments or the `env` block in `plugin.json`, change that command to
+match in the same commit.
 
 The package is published to PyPI as `hades-druglikeness` by
 `.github/workflows/publish.yml`, through PyPI trusted publishing (no API token):

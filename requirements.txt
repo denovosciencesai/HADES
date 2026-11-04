@@ -16,3 +16,9 @@ xgboost==3.0.2
 
 optuna==4.7.0
 fastparquet==2024.11.0
+
+# hyperopt (via admet_ai -> chemprop 1.6.1) imports pkg_resources, dropped in
+# setuptools 82. chemprop 1.6.1 declares no setuptools constraint, so nothing
+# else enforces this. Same pin as environment.yml, which carries it for conda
+# installs; this one covers pip and uvx. Keep the two in step.
+setuptools<82

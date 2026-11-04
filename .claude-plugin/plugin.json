@@ -2,7 +2,7 @@
   "name": "hades",
   "displayName": "HADES drug-likeness score",
   "version": "0.9.0",
-  "description": "Score the oral drug-likeness of small molecules from SMILES with HADES (Holistic AI-based Drug-likeness Estimation Score), a soft-voting ensemble over Mordred, ADMET-AI and QED descriptors, served as a local MCP tool.",
+  "description": "Score the oral drug-likeness of small molecules from SMILES with HADES (Holistic AI-based Drug-likeness Estimation Score), a soft-voting ensemble over Mordred, ADMET-AI and QED descriptors, served as a local MCP tool. Needs uv on PATH, and the one-time warm-up run in the README: the first install downloads about 3 GB.",
   "author": {
     "name": "Denovo Sciences",
     "url": "https://denovosciences.ai"
@@ -22,19 +22,21 @@
     "mordred",
     "mcp"
   ],
-  "userConfig": {
-    "python": {
-      "type": "file",
-      "title": "Python interpreter of the hades conda environment",
-      "description": "Absolute path to python in the conda environment built from environment.yml, with the MCP SDK added (see the HADES README). Write it out in full; ~ is not expanded. For example /home/you/miniconda3/envs/hades/bin/python or C:/Users/you/miniconda3/envs/hades/python.exe. Print it with: conda run -n hades python -c \"import sys; print(sys.executable)\"",
-      "required": true
-    }
-  },
   "mcpServers": {
     "hades": {
       "type": "stdio",
-      "command": "${user_config.python}",
-      "args": ["-B", "-s", "${CLAUDE_PLUGIN_ROOT}/hades_mcp.py"]
+      "command": "uvx",
+      "args": [
+        "--python",
+        "3.10",
+        "--from",
+        "hades-druglikeness[mcp]==0.9.0",
+        "hades-mcp"
+      ],
+      "env": {
+        "UV_EXTRA_INDEX_URL": "https://download.pytorch.org/whl/cpu",
+        "UV_INDEX_STRATEGY": "unsafe-best-match"
+      }
     }
   }
 }

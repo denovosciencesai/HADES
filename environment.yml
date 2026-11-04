@@ -1,3 +1,7 @@
+# The contributor and reproduction environment: what CI builds, what
+# CONTRIBUTING.md sets up, and what training wants. Scoring does not need it --
+# the models ship inside the package, so `pip install hades-druglikeness` (or
+# `uvx` for the MCP server) is enough for users. See README.md > Installation.
 name: hades
 channels:
   - conda-forge
