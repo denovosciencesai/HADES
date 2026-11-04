@@ -155,7 +155,17 @@ On Linux, PyPI's torch brings several GB of CUDA libraries that HADES does not
 use. PyTorch's CPU-only index avoids them, with identical scores. uv needs
 `--index-strategy unsafe-best-match` to pick each package from whichever index
 has the pinned version, as pip does; without it, uv looks for every package on
-the first index that lists it. Use the same options in the commands below:
+the first index that lists it.
+
+Use the same options in **every** command below, the warm-up and the
+registration alike. uv caches one environment per resolution and the index
+settings are part of it, so a warm-up that carries them and a registered server
+that does not resolve to different environments: the warm-up fills one, and the
+server still installs from scratch when the client first starts it — the wait
+the warm-up exists to avoid. The same applies to the `--from` specification: a
+warm-up pinned to a version and a registration that is not are two
+environments, which is why `.claude-plugin/plugin.json` and the plugin's
+warm-up in `README.md` pin the same version.
 
 ```bash
 uvx --extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match \

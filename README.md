@@ -223,8 +223,13 @@ claude mcp add --scope user hades -- uvx --python 3.10 --from "hades-druglikenes
 ```
 
 On Linux, add `--extra-index-url https://download.pytorch.org/whl/cpu --index-strategy unsafe-best-match`
-after `uvx` in both commands, to get the CPU-only torch; without it, the first run
-pulls CUDA libraries HADES does not use and needs about 6.5 GB. See
+after `uvx` in **both** commands, to get the CPU-only torch; without it, the first run
+pulls CUDA libraries HADES does not use and needs about 6.5 GB. Both, because uv
+caches one environment per resolution: the index settings are part of that
+resolution, so a warm-up that carries them and a registered server that does not
+(or the reverse) use different environments. The warm-up then fills one and
+leaves the server installing from scratch on first start, which is the wait it
+was run to avoid. See
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md#without-a-clone).
 
 **With the Claude Code plugin, nothing to configure.** The simplest route. The
