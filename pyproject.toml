@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 # The PyPI distribution name; `hades` is taken there. Imports are unchanged:
 # `import HADES`, `from HADES_CALCULATOR import HADES_score`.
 name = "hades-druglikeness"
-version = "0.9.0"
+version = "0.9.1"
 description = "Machine-learning oral drug-likeness score for small molecules from their SMILES"
 readme = "README.md"
 license = "MIT"
@@ -47,6 +47,11 @@ Homepage = "https://github.com/denovosciencesai/HADES"
 Documentation = "https://github.com/denovosciencesai/HADES#readme"
 Issues = "https://github.com/denovosciencesai/HADES/issues"
 Paper = "https://doi.org/10.1021/acs.jcim.5c02953"
+Security = "https://github.com/denovosciencesai/HADES/blob/main/SECURITY.md"
+# PyPI renders an unrecognised label verbatim, which is what we want here: the
+# project page otherwise shows eight personal names and nothing saying who
+# maintains HADES. Not `Homepage`, which is the repository and keeps its icon.
+"Denovo Sciences" = "https://denovosciences.ai"
 
 [project.optional-dependencies]
 # What CI and CONTRIBUTING.md install to run the checks. Pinned like everything

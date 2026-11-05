@@ -4,10 +4,10 @@
 # needs nothing else at runtime and the container never downloads anything.
 #
 # Build without a local Docker daemon:
-#   az acr build -r <registry> -t hades-mcp:0.9.0 -f deploy/Dockerfile .
+#   az acr build -r <registry> -t hades-mcp:0.9.1 -f deploy/Dockerfile .
 #
 # Run:
-#   docker run --rm -p 8000:8000 hades-mcp:0.9.0
+#   docker run --rm -p 8000:8000 hades-mcp:0.9.1
 #   # then point an MCP client at http://localhost:8000/mcp
 
 # The full image, not -slim. HADES never draws a molecule, but admet_ai imports
@@ -37,22 +37,21 @@ ENV PIP_NO_CACHE_DIR=1 \
 
 # The release to serve. Keep it pinned: a hosted HADES that silently changes
 # version changes the scores it reports, and nothing downstream would notice.
-ARG HADES_VERSION=0.9.0
+# CONTRIBUTING.md lists this with the other places the version lives.
+ARG HADES_VERSION=0.9.1
 
 # PyTorch's CPU-only build. PyPI's torch bundles several GB of CUDA libraries
 # HADES never uses; environment.yml records that the CPU build scores the
 # paper's test set bit-for-bit identically.
 #
-# setuptools<82 is pinned here too. hyperopt, reached through
-# admet_ai -> chemprop 1.6.1, imports pkg_resources, which setuptools 82
-# removed. Up to and including 0.9.0 that pin lives only in environment.yml and
-# never reached the published wheel's metadata, so a clean resolution here --
-# which is exactly what this build does -- can pick a setuptools that breaks
-# the import. Drop this once a release carries the pin itself.
+# setuptools<82 is no longer pinned here. It was, because the pin lived only in
+# environment.yml and so never reached the published wheel's metadata, which a
+# clean resolution like this one could then break. From 0.9.1 requirements.txt
+# carries it, and pyproject.toml builds the wheel's dependencies from that
+# file, so the constraint arrives with the package.
 RUN pip install \
       --extra-index-url https://download.pytorch.org/whl/cpu \
-      "hades-druglikeness[mcp]==${HADES_VERSION}" \
-      "setuptools<82"
+      "hades-druglikeness[mcp]==${HADES_VERSION}"
 
 # Scoring writes nothing and needs no privileges.
 RUN useradd --create-home --uid 10001 hades

@@ -123,6 +123,12 @@ Bump the version in `pyproject.toml`, `HADES/__init__.py`, `CITATION.cff` and
 the plugin only when the version in `plugin.json` changes; until then,
 `claude plugin update` keeps them on the copy they have.
 
+`deploy/Dockerfile` pins the release it serves as well, in `ARG
+HADES_VERSION`. Bump it in the same commit: left behind, the next image built
+from it serves the previous release, and because the container reports its own
+version in `serverInfo` the mismatch is visible to every client but to nobody
+reading the repository.
+
 `plugin.json` carries the version **twice**: its own `version`, and the
 `hades-druglikeness[mcp]==<version>` pin in the `uvx` arguments that decides
 which release the plugin actually runs. Bump both, and merge the bump to `main`
