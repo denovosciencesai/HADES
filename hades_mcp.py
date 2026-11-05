@@ -190,6 +190,37 @@ def _load_hades() -> Any:
     return scorer
 
 
+_rdkit_silenced = False
+
+
+def _silence_rdkit() -> None:
+    """Stop RDKit writing the molecules it cannot parse to stderr.
+
+    RDKit reports parse failures from C++ through its `rdApp.*` loggers, which
+    `HADES.quiet_noise` does not reach -- that silences Python loggers,
+    warnings and tqdm. The message quotes the input back:
+
+        SMILES Parse Error: Failed parsing SMILES 'NOT_A_SMILES'
+
+    Harmless in a terminal, where the structure is the user's own and already
+    on their screen. On a server it is the one path by which a submitted
+    structure reaches the console, in a service that otherwise records nothing
+    about a request -- and it is the malformed inputs, a mistyped compound
+    among them, that get echoed. The caller is told why the input failed
+    through `invalid` either way, so silencing the duplicate loses nothing.
+
+    Idempotent: `DisableLog` is cheap, but importing rdkit is not, and this
+    runs on every scoring call.
+    """
+    global _rdkit_silenced
+    if _rdkit_silenced:
+        return
+    from rdkit import RDLogger  # noqa: PLC0415 -- deliberately lazy
+
+    RDLogger.DisableLog("rdApp.*")
+    _rdkit_silenced = True
+
+
 def _standardization_problem(smiles: str) -> str | None:
     """Why the molecule HADES would score, once standardized, cannot be scored."""
     from rdkit import Chem  # noqa: PLC0415 -- deliberately lazy
@@ -223,6 +254,7 @@ def _score_sync(requested: list[str]) -> dict[str, list[dict[str, Any]]]:
     global _hades
     with _model_lock:
         _importable()
+        _silence_rdkit()
         from HADES.featurize import unscoreable_reason  # noqa: PLC0415 -- deliberately lazy
 
         valid: list[tuple[int, str]] = []

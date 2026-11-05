@@ -1,0 +1,5 @@
+# The image installs HADES from PyPI, so the build context needs only the
+# entry point. Without this, every build uploads the repository, including the
+# models and train_test_saved -- over 100 MB, none of it used.
+*
+!deploy/serve.py
