@@ -168,6 +168,23 @@ def test_modern_protocol_round_trip():
     assert result.structured_content["invalid"][0]["smiles"] == "NOT_A_SMILES"
 
 
+def test_server_reports_its_version():
+    """`serverInfo` carries the HADES version.
+
+    Left unset, the SDK reports an empty string, and a client holding a score
+    -- or a model writing one into a summary -- cannot say which HADES
+    produced it. The number must also belong to the code that does the
+    scoring: the package beside this server, not whatever release happens to
+    be installed next to it, which is why `_version()` asks HADES before it
+    asks the distribution metadata.
+    """
+    from HADES import __version__
+
+    assert hades_mcp._version() == __version__
+    assert hades_mcp.mcp.version == __version__
+    assert hades_mcp.mcp.version, "the SDK's empty-string default reached serverInfo"
+
+
 def test_unparseable_smiles_is_not_echoed_to_output(capfd):
     """A rejected input must not be written to the console.
 

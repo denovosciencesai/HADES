@@ -48,6 +48,7 @@ pip install -e ".[mcp]"
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import inspect
 import logging
 import os
@@ -74,8 +75,49 @@ REPO_ROOT = Path(os.environ.get("HADES_REPO") or Path(__file__).resolve().parent
 VERIFY = os.environ.get("HADES_VERIFY") or "auto"
 MAX_BATCH = int(os.environ.get("HADES_MAX_BATCH") or 100)
 
+
+def _importable():
+    """Put the repository on sys.path, so HADES_CALCULATOR and HADES import from it."""
+    if str(REPO_ROOT) not in sys.path:
+        sys.path.insert(0, str(REPO_ROOT))
+
+
+def _version() -> str:
+    """The HADES version, for the `serverInfo` a client reads on initialize.
+
+    Left unset, the SDK reports an empty string, and nothing downstream can say
+    which HADES produced a score -- including a model writing the number into a
+    summary, and a reviewer asked to reproduce it.
+
+    Ask the package before the distribution metadata, because they can
+    disagree and only one of them is the truth. `_importable()` puts REPO_ROOT
+    at the front of `sys.path`, so `HADES.__version__` is the version of the
+    code and models this server will actually score with: the clone's, when
+    running from a clone that sits beside a different installed release, and
+    the installed one otherwise. `importlib.metadata` would answer with
+    whatever is installed either way, which is the wrong number in exactly the
+    case where the two differ. It stays as the fallback for an installation
+    whose package cannot be imported.
+
+    Importing HADES here is cheap: its re-exports are lazy, so this does not
+    pull torch in at startup.
+    """
+    try:
+        _importable()
+        from HADES import __version__  # noqa: PLC0415 -- deliberately lazy
+        return __version__
+    except Exception:
+        pass
+    try:
+        return importlib.metadata.version("hades-druglikeness")
+    except importlib.metadata.PackageNotFoundError:
+        log.warning("Cannot determine the HADES version; reporting it as 'unknown'.")
+        return "unknown"
+
+
 mcp = MCPServer(
     name="hades",
+    version=_version(),
     instructions=(
         "Scores small molecules with HADES (Holistic AI-based Drug-likeness "
         "Estimation Score), a soft-voting ensemble of five tree and gradient-"
@@ -104,12 +146,6 @@ class Unscored(BaseModel):
 class ScoreReport(BaseModel):
     results: list[Scored] = Field(description="One entry per scored molecule, in input order")
     invalid: list[Unscored] = Field(description="One entry per input that could not be scored")
-
-
-def _importable():
-    """Put the repository on sys.path, so HADES_CALCULATOR and HADES import from it."""
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
 
 
 def _model_paths(scorer: type) -> dict[str, str]:
