@@ -168,6 +168,25 @@ def test_modern_protocol_round_trip():
     assert result.structured_content["invalid"][0]["smiles"] == "NOT_A_SMILES"
 
 
+def test_unparseable_smiles_is_not_echoed_to_output(capfd):
+    """A rejected input must not be written to the console.
+
+    RDKit reports parse failures from C++ and quotes the input back
+    ("SMILES Parse Error: Failed parsing SMILES 'NOT_A_SMILES'"). In a terminal
+    that is harmless. On a hosted server it is the one path by which a
+    submitted structure reaches the console of a service that otherwise
+    records nothing about a request, and it is the malformed inputs -- a
+    mistyped compound among them -- that get echoed. `capfd` rather than
+    `capsys` because the write comes from compiled code, straight to fd 2.
+    """
+    report = hades_mcp._score_sync(["NOT_A_SMILES"])
+    out, err = capfd.readouterr()
+
+    assert report["invalid"][0]["smiles"] == "NOT_A_SMILES", report
+    assert "NOT_A_SMILES" not in err, f"the rejected input reached stderr: {err!r}"
+    assert "NOT_A_SMILES" not in out, f"the rejected input reached stdout: {out!r}"
+
+
 def test_stray_output_lands_on_stderr(tmp_path):
     """Output printed during a call must reach stderr, never the JSON-RPC stream.
 
