@@ -342,9 +342,20 @@ async def hades_score(
     return ScoreReport.model_validate(report)
 
 
+# An approved oral drug, something nobody would call one, and a string that is
+# not a molecule at all: enough to show the score moving across its range and
+# the rejection path working. The previous default scored three near-zeros,
+# which demonstrated only half of that.
+SELFTEST_SAMPLES = [
+    "CC(C)Cc1ccc(cc1)C(C)C(=O)O",  # ibuprofen
+    "CCO",                         # ethanol
+    "not-a-molecule",
+]
+
+
 def _selftest(smiles: list[str]) -> int:
     """Score some molecules and report on stderr. Bypasses MCP entirely."""
-    samples = smiles or ["CCO", "c1ccccc1", "CC(=O)Oc1ccccc1C(=O)O", "not-a-molecule"]
+    samples = smiles or list(SELFTEST_SAMPLES)
     report = _score_sync(samples)
     for entry in report["invalid"]:
         print(f"  REJECTED  {entry['smiles']!r}: {entry['reason']}", file=sys.stderr)
