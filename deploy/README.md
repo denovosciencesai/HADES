@@ -28,14 +28,14 @@ No local Docker daemon needed — Azure Container Registry builds it:
 
 ```bash
 az acr build -r <registry> -g <resource-group> \
-    -t hades-mcp:0.9.0 -f deploy/Dockerfile --platform linux/amd64 .
+    -t hades-mcp:0.9.1 -f deploy/Dockerfile --platform linux/amd64 .
 ```
 
 or, with Docker:
 
 ```bash
-docker build -t hades-mcp:0.9.0 -f deploy/Dockerfile .
-docker run --rm -p 8000:8000 hades-mcp:0.9.0
+docker build -t hades-mcp:0.9.1 -f deploy/Dockerfile .
+docker run --rm -p 8000:8000 hades-mcp:0.9.1
 # the MCP endpoint is then http://localhost:8000/mcp
 ```
 
@@ -64,7 +64,7 @@ successful request.
 
 ```bash
 az containerapp create -n hades-mcp -g <resource-group> --environment <env> \
-    --image <registry>.azurecr.io/hades-mcp:0.9.0 \
+    --image <registry>.azurecr.io/hades-mcp:0.9.1 \
     --registry-server <registry>.azurecr.io --registry-identity system \
     --target-port 8000 --ingress external --transport http \
     --cpu 2 --memory 4Gi --min-replicas 1 --max-replicas 2

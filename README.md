@@ -246,7 +246,7 @@ entry and leaves the plugin to install from scratch anyway:
 ```bash
 UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu \
 UV_INDEX_STRATEGY=unsafe-best-match \
-uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.0" hades-mcp --selftest
+uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.1" hades-mcp --selftest
 ```
 
 In PowerShell:
@@ -254,7 +254,7 @@ In PowerShell:
 ```powershell
 $env:UV_EXTRA_INDEX_URL = "https://download.pytorch.org/whl/cpu"
 $env:UV_INDEX_STRATEGY = "unsafe-best-match"
-uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.0" hades-mcp --selftest
+uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.1" hades-mcp --selftest
 ```
 
 It prints a score for ethanol (`0.0178  CCO`). Then:
@@ -275,6 +275,15 @@ MCP SDK, then register the clone's `hades_mcp.py` with that environment's Python
 pip install "mcp==2.3.0"
 claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /home/you/HADES/hades_mcp.py
 ```
+
+**Hosted, nothing to install.** Denovo Sciences runs HADES as a remote MCP
+server at `https://hades.denovosciences.ai/mcp`, for clients that cannot start a
+local process — Claude in a browser, and on mobile. Add it as a custom
+connector. Scoring then happens on our servers rather than on your machine, so
+the molecules you send leave it:
+see [docs/privacy.md](https://github.com/denovosciencesai/HADES/blob/main/docs/privacy.md).
+To run the same container inside your own network instead, see
+[deploy/README.md](https://github.com/denovosciencesai/HADES/blob/main/deploy/README.md).
 
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md) covers installing from a shell or a local clone, Claude
@@ -362,3 +371,6 @@ running the tests and submitting changes. To report a security problem, follow
 ## License
 
 MIT. See [LICENSE](https://github.com/denovosciencesai/HADES/blob/main/LICENSE).
+
+HADES is developed and maintained by
+[Denovo Sciences](https://denovosciences.ai), the authors of the paper above.

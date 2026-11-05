@@ -6,7 +6,7 @@ abstract: >-
   molecule from its SMILES string.
 message: "If you use HADES, please cite the article under preferred-citation."
 type: software
-version: 0.9.0
+version: 0.9.1
 license: MIT
 repository-code: "https://github.com/denovosciencesai/HADES"
 keywords:

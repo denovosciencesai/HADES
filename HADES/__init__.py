@@ -15,7 +15,7 @@ import orders working -- and keeps a bare `import HADES` from pulling in torch,
 admet_ai and the gradient-boosting libraries.
 """
 
-__version__ = "0.9.0"
+__version__ = "0.9.1"
 __all__ = ["HADES_score", "HADESTrainer"]
 
 _LAZY_EXPORTS = {"HADES_score": "HADES_CALCULATOR", "HADESTrainer": "train_your_HADES"}
