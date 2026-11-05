@@ -199,8 +199,10 @@ custom_hades = HADES_score(models_dir="my_model/models", x_train_parquet="my_mod
 `hades_mcp.py` is a cheminformatics MCP server: it serves HADES over the
 [Model Context Protocol](https://modelcontextprotocol.io), so Claude and other AI assistants can score molecules while they work. It exposes
 one tool, `hades_score`, which takes a list of SMILES and returns a score for each,
-plus a reason for every input it could not score. Scoring runs on your machine.
-Pick one of the ways below; each ends with the server registered in Claude Code.
+plus a reason for every input it could not score. The first four ways below run
+it on your machine and end with the server registered in Claude Code; the last
+is a server Denovo Sciences hosts, for clients that cannot start a local
+process.
 
 **With pip.** Install HADES with the `mcp` extra, then register its `hades-mcp`
 command by its full path:
@@ -276,18 +278,19 @@ pip install "mcp==2.3.0"
 claude mcp add --scope user hades -- /home/you/miniconda3/envs/hades/bin/python /home/you/HADES/hades_mcp.py
 ```
 
-**Hosted, nothing to install.** Denovo Sciences runs HADES as a remote MCP
-server at `https://hades.denovosciences.ai/mcp`, for clients that cannot start a
-local process — Claude in a browser, and on mobile. Add it as a custom
-connector. Scoring then happens on our servers rather than on your machine, so
-the molecules you send leave it:
-see [docs/privacy.md](https://github.com/denovosciencesai/HADES/blob/main/docs/privacy.md).
-To run the same container inside your own network instead, see
-[deploy/README.md](https://github.com/denovosciencesai/HADES/blob/main/deploy/README.md).
-
 Check it with `/mcp`, then ask Claude for the HADES score of a molecule.
 [docs/mcp.md](https://github.com/denovosciencesai/HADES/blob/main/docs/mcp.md) covers installing from a shell or a local clone, Claude
 Desktop and other clients, Windows and WSL, the tool's output and its configuration.
+
+**Hosted, nothing to install.** Denovo Sciences runs HADES as a remote MCP
+server at `https://hades.denovosciences.ai/mcp`, for clients that cannot start a
+local process — Claude in a browser, and on mobile. Add it as a custom
+connector. Scoring then happens on that server rather than on your machine, so
+the molecules you send leave it;
+[docs/privacy.md](https://github.com/denovosciencesai/HADES/blob/main/docs/privacy.md)
+says what happens to them. To run the same container inside your own network
+instead, see
+[deploy/README.md](https://github.com/denovosciencesai/HADES/blob/main/deploy/README.md).
 
 ## Model files and integrity
 
@@ -368,9 +371,11 @@ Yes. HADES is released under the MIT license, which allows commercial use; see
 running the tests and submitting changes. To report a security problem, follow
 [SECURITY.md](https://github.com/denovosciencesai/HADES/blob/main/SECURITY.md).
 
+## Maintainers
+
+HADES is developed and maintained by
+[Denovo Sciences](https://denovosciences.ai), where the paper's authors work.
+
 ## License
 
 MIT. See [LICENSE](https://github.com/denovosciencesai/HADES/blob/main/LICENSE).
-
-HADES is developed and maintained by
-[Denovo Sciences](https://denovosciences.ai), the authors of the paper above.

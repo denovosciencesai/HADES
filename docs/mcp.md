@@ -9,6 +9,7 @@ molecule, plus a reason for every input it could not score.
 **Contents:** [Install](#install) ·
 [Claude Code plugin](#claude-code-plugin) ·
 [Other MCP clients](#other-mcp-clients) ·
+[Claude on the web and mobile](#claude-on-the-web-and-mobile) ·
 [What the tool returns](#what-the-tool-returns) ·
 [Configuration](#configuration)
 
@@ -52,28 +53,33 @@ then install the plugin from it:
 To install from a local clone instead of GitHub, add the marketplace by path:
 `/plugin marketplace add /path/to/HADES`.
 
-The plugin asks for one setting: the absolute path of the Python interpreter of
-the environment from [Install](#install). To print it, run this inside that
-environment:
+The plugin asks for nothing. It runs the same `uvx` command as
+[Without a clone](#without-a-clone), so it needs [uv](https://docs.astral.sh/uv/)
+on your `PATH` and no Python environment of its own, and it passes the CPU-only
+torch index itself.
+
+Run the warm-up once in a terminal before installing. uv caches an environment
+per resolution, so run **exactly** the command the plugin runs — the same pin
+and the same index settings — or the warm-up fills a different cache entry and
+the plugin installs from scratch on first start, which takes far longer than an
+MCP client waits:
 
 ```bash
-python -c "import sys; print(sys.executable)"
+UV_EXTRA_INDEX_URL=https://download.pytorch.org/whl/cpu \
+UV_INDEX_STRATEGY=unsafe-best-match \
+uvx --python 3.10 --from "hades-druglikeness[mcp]==0.9.1" hades-mcp --selftest
 ```
 
 From a shell, the same install is:
 
 ```bash
 claude plugin marketplace add denovosciencesai/HADES
-claude plugin install hades@denovo-hades --config python=/home/you/miniconda3/envs/hades/bin/python
+claude plugin install hades@denovo-hades
 ```
 
-A shell install never prompts, so pass the interpreter with `--config`, or set it
-later with `/plugin configure hades@denovo-hades`. Write the path out in full:
-`~` is not expanded, and a wrong path only shows up when the server fails to
-start. On Windows the path looks like
-`C:/Users/you/miniconda3/envs/hades/python.exe`. Check the server with `/mcp`;
-the tool appears as `mcp__plugin_hades_hades__hades_score`. The plugin was tested
-with Claude Code 2.1.299 on Windows.
+Check the server with `/mcp`; the tool appears as
+`mcp__plugin_hades_hades__hades_score`. The plugin was tested with Claude Code
+2.1.299 on Windows.
 
 A GitHub install keeps two copies of the repository, models included: the
 marketplace clone and the plugin cache, about 210 MB together. Installing from a
@@ -82,8 +88,8 @@ from a clean checkout. The plugin is pinned to a version, and third-party
 marketplaces do not auto-update by default, so pull a new release with
 `claude plugin update hades@denovo-hades`.
 
-The plugin runs one thing: `hades_mcp.py`, with the interpreter you configured,
-on your machine. Scoring is local. Before loading the pickled models, the server
+The plugin runs one thing: `hades-mcp`, from a uv-managed environment, on your
+machine. Scoring is local. Before loading the pickled models, the server
 checks them against `SHA256SUMS`, as described in
 [Model files and integrity](model-integrity.md).
 
@@ -193,6 +199,18 @@ or in `claude_desktop_config.json` and clients that use its format:
 
 If the client cannot find `uvx`, give its full path (`which uvx`, or `where uvx`
 on Windows).
+
+## Claude on the web and mobile
+
+Those clients cannot start a local process, so they cannot run any of the above.
+Denovo Sciences hosts the same server for them, at
+`https://hades.denovosciences.ai/mcp`. Add it in Settings → Connectors → Add
+custom connector. There is no account and no key.
+
+Scoring then happens on that server rather than on your machine, so the
+molecules you send leave it; [privacy.md](privacy.md) says what happens to them.
+If your structures are confidential, use one of the local routes above, or run
+the same container inside your own network — [../deploy/README.md](../deploy/README.md).
 
 ## What the tool returns
 
