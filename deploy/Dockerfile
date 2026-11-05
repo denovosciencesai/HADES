@@ -69,7 +69,7 @@ RUN python -c "import hades_mcp; r = hades_mcp._score_sync(['CCO']); \
 print('build smoke test:', r['results']); \
 assert abs(r['results'][0]['hades_score'] - 0.017846526) < 1e-4, r"
 
-# hades_mcp reads these when --http is given without --host/--port.
+# serve.py reads these.
 ENV HADES_HOST=0.0.0.0 \
     HADES_PORT=8000
 
@@ -77,5 +77,6 @@ EXPOSE 8000
 
 # serve.py loads the ensemble before binding the port, so a container that is
 # accepting connections is a container that can score. Expect 30-60 seconds
-# between start and the first successful request.
-CMD ["python", "serve.py", "--http"]
+# between start and the first successful request. It takes no arguments: it
+# serves streamable HTTP, statelessly, and reads the rest from the environment.
+CMD ["python", "serve.py"]
