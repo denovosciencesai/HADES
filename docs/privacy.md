@@ -30,13 +30,6 @@ Those SMILES are held in memory for the duration of the request, used to compute
 a score, and returned to you. They are not written to disk, not recorded in any
 log we keep, and not retained after the response is sent.
 
-One current exception, stated because it is true today: if a string cannot be
-parsed as SMILES at all, the chemistry library echoes it, together with the parse
-error, to the container's console output, and the hosting platform keeps that
-output readable to us for a period even though no log destination is configured.
-This affects only input the parser rejects. We do not collect anything from that
-output.
-
 **We do not use submitted structures to train, tune or improve the model, or for
 any purpose other than returning your score.** The model is fixed and versioned;
 see [model-integrity.md](model-integrity.md).
@@ -114,8 +107,7 @@ destination configured.
 ## Retention
 
 Request content is not retained: it exists only in memory while the request is
-served, with the one exception of the parse-error echo described under
-"What we collect".
+served.
 
 Cloudflare retains its analytics and security event data for at least 30 days,
 on a schedule Cloudflare sets. Those datasets are built from connection
