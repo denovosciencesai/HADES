@@ -29,6 +29,11 @@ Only the latest release receives security fixes.
   `SHA256SUMS`.
 - Any other way that scoring or training runs code or writes files the user did
   not ask for.
+- The hosted server Denovo Sciences runs at `https://hades.denovosciences.ai/mcp`:
+  reaching its origin without going through the edge, getting it to record or
+  disclose a submitted structure, or denying service to others. What it does and
+  does not record is in [docs/privacy.md](docs/privacy.md); the same container is
+  in [deploy/](deploy/) for anyone running their own.
 
 ## What is not in scope
 

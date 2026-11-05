@@ -131,18 +131,40 @@ reading the repository.
 
 `plugin.json` carries the version **twice**: its own `version`, and the
 `hades-druglikeness[mcp]==<version>` pin in the `uvx` arguments that decides
-which release the plugin actually runs. Bump both, and merge the bump to `main`
-only once that version is on PyPI — a plugin pinned to a version PyPI does not
-have yet fails to start, with a uv resolution error rather than anything about
-HADES.
+which release the plugin actually runs.
 
-The same pin appears a third time, in the plugin's warm-up command in
-`README.md`. It has to: uv caches one environment per resolution, so a warm-up
-whose pin, extra index or index strategy differs from the plugin's fills a
-different cache entry and leaves the plugin installing from scratch on first
-start — the 15-minute hang the warm-up exists to prevent. If you change the
-`uvx` arguments or the `env` block in `plugin.json`, change that command to
-match in the same commit.
+**Merge the plugin pin to `main` only once that version is on PyPI.** The
+marketplace serves from the default branch, so between the merge and the
+upload every `/plugin install` and `claude plugin update` produces a server
+that fails to start, with a uv resolution error rather than anything about
+HADES. 0.9.1 was released this way and had exactly that window. Either publish
+the release from the tag before merging the bump, or keep the pin in a
+follow-up pull request and merge it after the upload.
+
+The same pin appears in the plugin's warm-up command in `README.md` — twice,
+once for bash and once for PowerShell — and again in `docs/mcp.md`. It has to:
+uv caches one environment per resolution, so a warm-up whose pin, extra index
+or index strategy differs from the plugin's fills a different cache entry and
+leaves the plugin installing from scratch on first start — the 15-minute hang
+the warm-up exists to prevent. If you change the `uvx` arguments or the `env`
+block in `plugin.json`, change those commands to match in the same commit.
+
+Nine places in all, and it is worth listing them rather than counting:
+
+1. `pyproject.toml`
+2. `HADES/__init__.py`
+3. `CITATION.cff`
+4. `.claude-plugin/plugin.json`, its own `version`
+5. `.claude-plugin/plugin.json`, the `uvx` pin
+6. `README.md`, the bash warm-up
+7. `README.md`, the PowerShell warm-up
+8. `docs/mcp.md`, the warm-up
+9. `deploy/Dockerfile`, `ARG HADES_VERSION`
+
+The image tags in `deploy/Dockerfile`'s header comment and in
+`deploy/README.md` are examples rather than pins, but they age badly if left
+behind. `grep -rn "<previous version>"` over tracked files before tagging
+catches all of it, and has already caught a miss that would have shipped.
 
 The package is published to PyPI as `hades-druglikeness` by
 `.github/workflows/publish.yml`, through PyPI trusted publishing (no API token):
@@ -160,3 +182,12 @@ The package is published to PyPI as `hades-druglikeness` by
 
 A version number can be uploaded to PyPI only once, even after it is deleted,
 so a mistake means a new version.
+
+The release is not finished at the upload. The hosted server installs from
+PyPI too, so until its image is rebuilt it runs the previous release and
+reports that version in `serverInfo`:
+
+4. Rebuild the image at the new `ARG HADES_VERSION` and update the container
+   app (see [deploy/README.md](deploy/README.md)).
+5. Call the endpoint and check `serverInfo` reports the version you just
+   released.

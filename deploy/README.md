@@ -89,10 +89,19 @@ az containerapp ingress access-restriction set -n hades-mcp -g <resource-group> 
 ```
 
 An open endpoint is a scoring service anyone can bill to your subscription.
-Before removing the restriction, put a token or OAuth in front of it; a listing
-in Anthropic's connector directory requires OAuth in any case.
+Before removing the restriction, put something in front of it.
+
+The instance Denovo Sciences runs takes the other route, and it is worth
+describing because it is not the one above. It has no authentication —
+scoring needs no account, and Anthropic's connector directory allows that for a
+service that holds none. Instead Cloudflare sits in front for TLS and per-address
+rate limiting, and the ingress allow-list names Cloudflare's published ranges
+rather than one operator address, so the origin cannot be reached directly at
+all. [docs/privacy.md](../docs/privacy.md) describes what that arrangement does
+and does not record.
 
 Scoring is read-only and writes nothing, the container runs as a non-root user,
-and no structure is logged — but a hosted HADES does mean SMILES leave the
-submitter's machine. Say so plainly to anyone you offer it to, and expect
-pharmaceutical users to prefer self-hosting for exactly that reason.
+and from 0.9.1 no submitted structure reaches the console: before that, RDKit
+echoed the ones it could not parse to stderr. A hosted HADES still means SMILES
+leave the submitter's machine. Say so plainly to anyone you offer it to, and
+expect pharmaceutical users to prefer self-hosting for exactly that reason.
