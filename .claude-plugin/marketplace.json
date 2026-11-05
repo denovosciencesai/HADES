@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "hades",
-      "source": "./",
+      "source": "./plugin",
       "description": "Score the oral drug-likeness of molecules from SMILES with the HADES ensemble (local MCP server)",
       "category": "science",
       "tags": ["drug-discovery", "cheminformatics", "drug-likeness", "admet"]

@@ -118,7 +118,7 @@ jobs:
           EOF
 
   uvx:
-    # The route .claude-plugin/plugin.json runs, and the one README.md gives
+    # The route plugin/.claude-plugin/plugin.json runs, and the one README.md gives
     # for Claude. The pip job above installs into a prepared Python 3.10; this
     # one starts from nothing, lets uv fetch its own interpreter and resolve
     # the whole stack from scratch -- which is where a dependency that is

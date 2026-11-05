@@ -81,9 +81,10 @@ Check the server with `/mcp`; the tool appears as
 `mcp__plugin_hades_hades__hades_score`. The plugin was tested with Claude Code
 2.1.299 on Windows.
 
-A GitHub install keeps two copies of the repository, models included: the
-marketplace clone and the plugin cache, about 210 MB together. Installing from a
-local clone copies that whole directory, untracked files included, so install
+A GitHub install clones the repository for the marketplace, but the plugin
+itself is the `plugin/` directory and holds only its manifest: a couple of
+kilobytes, no models. Everything it runs comes from PyPI through uv. Installing
+from a local clone copies that directory, untracked files included, so install
 from a clean checkout. The plugin is pinned to a version, and third-party
 marketplaces do not auto-update by default, so pull a new release with
 `claude plugin update hades@denovo-hades`.
@@ -170,7 +171,7 @@ that does not resolve to different environments: the warm-up fills one, and the
 server still installs from scratch when the client first starts it — the wait
 the warm-up exists to avoid. The same applies to the `--from` specification: a
 warm-up pinned to a version and a registration that is not are two
-environments, which is why `.claude-plugin/plugin.json` and the plugin's
+environments, which is why `plugin/.claude-plugin/plugin.json` and the plugin's
 warm-up in `README.md` pin the same version.
 
 ```bash

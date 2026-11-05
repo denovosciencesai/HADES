@@ -40,7 +40,8 @@ built on it.
 ├── HADES_CALCULATOR.py         # HADES_score and the hades-score command
 ├── train_your_HADES.py         # HADESTrainer and the hades-train command
 ├── hades_mcp.py                # the MCP server and the hades-mcp command
-├── .claude-plugin/             # Claude Code plugin manifest and marketplace
+├── .claude-plugin/             # marketplace manifest (lists the plugin below)
+├── plugin/                     # the Claude Code plugin: its manifest, and nothing else
 ├── parameters_test.py          # a small example hyperparameter space
 ├── train_test_saved/           # the paper's train/test split (not shipped with the package)
 ├── data_to_test.csv            # a small sample to score and train on
@@ -119,7 +120,7 @@ write_manifest("HADES/data/models")
 ## Releasing
 
 Bump the version in `pyproject.toml`, `HADES/__init__.py`, `CITATION.cff` and
-`.claude-plugin/plugin.json` together. Claude Code users get a new version of
+`plugin/.claude-plugin/plugin.json` together. Claude Code users get a new version of
 the plugin only when the version in `plugin.json` changes; until then,
 `claude plugin update` keeps them on the copy they have.
 
@@ -154,8 +155,8 @@ Nine places in all, and it is worth listing them rather than counting:
 1. `pyproject.toml`
 2. `HADES/__init__.py`
 3. `CITATION.cff`
-4. `.claude-plugin/plugin.json`, its own `version`
-5. `.claude-plugin/plugin.json`, the `uvx` pin
+4. `plugin/.claude-plugin/plugin.json`, its own `version`
+5. `plugin/.claude-plugin/plugin.json`, the `uvx` pin
 6. `README.md`, the bash warm-up
 7. `README.md`, the PowerShell warm-up
 8. `docs/mcp.md`, the warm-up
